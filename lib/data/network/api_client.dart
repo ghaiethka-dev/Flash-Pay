@@ -30,11 +30,7 @@ class ApiClient {
         return handler.next(options);
       },
       onError: (DioException e, handler) {
-        // يمكنك هنا معالجة أخطاء الـ 401 (انتهاء صلاحية التوكن) وتوجيه المستخدم لتسجيل الدخول
-        if (e.response?.statusCode == 401) {
-          _storageService.clearAuthData();
-          Get.offAllNamed('/login');
-        }
+        // مرر الخطأ للـ controller ليتعامل معه (تجنب التعارض مع block check)
         return handler.next(e);
       },
     ));

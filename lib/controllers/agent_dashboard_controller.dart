@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
+import 'package:get/get.dart' hide FormData;
 import 'package:dio/dio.dart';
 import '../data/local/storage_service.dart';
 import '../data/network/api_client.dart';
@@ -22,9 +22,37 @@ class AgentDashboardController extends GetxController {
   void onInit() {
     super.onInit();
     agentName.value = _storageService.getUserName() ?? 'وكيل';
-    fetchAgentTransfers(); 
+    fetchAgentTransfers();
+    fetchAgentSafe();
   }
+// متغيرات الصندوق
+  var agentSafeBalance = 0.0.obs;
+  var safeTransfers = <Map<String, dynamic>>[].obs;
+  var isSafeLoading = false.obs;
 
+  Future<void> fetchAgentSafe() async {
+    isSafeLoading.value = true;
+    try {
+      // صندوق الوكيل مباشرة
+      final safeResponse = await _apiClient.dio.get('/agent/safe');
+      final balance = safeResponse.data['data']['balance'];
+      agentSafeBalance.value = double.tryParse(balance.toString()) ?? 0.0;
+
+      // سجل الحوالات الموجودة في الصندوق
+      final transfersResponse = await _apiClient.dio.get('/transfers');
+      final all = transfersResponse.data['data'] as List;
+      safeTransfers.assignAll(
+          all
+              .where((t) => t['status'] == 'approved' || t['status'] == 'waiting')
+              .cast<Map<String, dynamic>>()
+              .toList()
+      );
+    } catch (e) {
+      print("Error fetching agent safe: $e");
+    } finally {
+      isSafeLoading.value = false;
+    }
+  }
   void changeTabIndex(int index) {
     selectedIndex.value = index;
     if (index == 0 || index == 1) {
@@ -63,9 +91,12 @@ class AgentDashboardController extends GetxController {
     Get.dialog(const Center(child: CircularProgressIndicator()), barrierDismissible: false);
 
     try {
-      final response = await _apiClient.dio.patch(
+      final response = await _apiClient.dio.post(
         '/transfers/$transferId/update-status',
-        data: {'status': newStatus},
+        data: FormData.fromMap({
+          'status': newStatus,
+          '_method': 'PATCH', // بعض السيرفرات تحتاج هذا السطر في لارافيل
+        }),
       );
 
       if (response.statusCode == 200) {
@@ -78,9 +109,9 @@ class AgentDashboardController extends GetxController {
         else if (newStatus == 'waiting') message = 'تم إرسال الحوالة إلى المكتب بنجاح';
 
         Get.snackbar(
-          'نجاح', 
-          message, 
-          backgroundColor: newStatus == 'rejected' ? Colors.red : Colors.green, 
+          'نجاح',
+          message,
+          backgroundColor: newStatus == 'rejected' ? Colors.red : Colors.green,
           colorText: Colors.white
         );
         
