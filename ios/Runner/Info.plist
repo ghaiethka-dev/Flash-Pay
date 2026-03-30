@@ -4,6 +4,8 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+<string>نحتاج إذنك لحفظ الصور في مكتبة الصور</string>
 	<key>CFBundleDisplayName</key>
 	<string>Flashpay</string>
 	<key>CFBundleExecutable</key>

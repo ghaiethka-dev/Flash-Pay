@@ -5,6 +5,8 @@ import 'package:dio/dio.dart' as dio;
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../data/local/storage_service.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flashpay/data/network/api_client.dart'; // سنحتاجها لتحديث التوكن بعد الدخول
 
 class AuthController extends GetxController {
   final AuthRepository _authRepository = AuthRepository();
@@ -139,6 +141,14 @@ class AuthController extends GetxController {
           return;
         }
         await _storageService.saveIsBlocked(false);
+        try {
+          String? fcmToken = await FirebaseMessaging.instance.getToken();
+          if (fcmToken != null) {
+            await ApiClient().dio.post('/update-fcm-token', data: {'fcm_token': fcmToken});
+          }
+        } catch (e) {
+          debugPrint('Failed to update FCM token on login: $e');
+        }
 
         if (role == 'customer') {
           Get.offAllNamed('/user_dashboard');
@@ -187,6 +197,8 @@ class AuthController extends GetxController {
 
     isLoading.value = true;
     try {
+      // ✅ جلب الـ FCM Token من الجهاز
+      String? fcmToken = await FirebaseMessaging.instance.getToken();
       // ✅ نرسل country_id و city_id مباشرة (أرقام صحيحة من الـ API)
       final formData = dio.FormData.fromMap({
         'name':       fullNameController.text.trim(),
@@ -196,6 +208,7 @@ class AuthController extends GetxController {
         'role':       'customer',
         'country_id': selectedCountryId.value,
         'city_id':    selectedCityId.value,
+        'fcm_token':  fcmToken ?? '', // ✅ إضافة التوكن هنا
         'id_card_image': await dio.MultipartFile.fromFile(
           idCardImage.value!.path,
           filename: 'id_card.jpg',

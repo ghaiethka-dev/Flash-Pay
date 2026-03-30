@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "499242475191",
+    "project_id": "flash-pay-8174c",
+    "storage_bucket": "flash-pay-8174c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:499242475191:android:a2c51aada138ad5e8a7732",
+        "android_client_info": {
+          "package_name": "com.example.flashpay"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDVDc88N9bbI9TonQDh1mcFQtjMJaxLZVg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

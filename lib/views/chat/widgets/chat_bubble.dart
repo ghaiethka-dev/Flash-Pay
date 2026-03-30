@@ -1,134 +1,95 @@
 // =============================================================================
-//  chat_bubble.dart
-//  Flash Pay — WhatsApp-Style Premium Chat Bubble
-//  ───────────────────────────────────────────────
-//
-//  POSITIONING (WhatsApp convention — data logic untouched):
-//    isMe == true   → RIGHT  (my messages)
-//    isMe == false  → LEFT   (other person's messages)
-//
-//  COLOR PALETTE:
-//    Sender   (RIGHT) → brand gradient  +  white text
-//    Receiver (LEFT)  → neutral gray    +  dark/light text by mode
-//
-//  ASYMMETRIC TAIL RADIUS:
-//    Sender   (RIGHT) → sharp bottom-RIGHT corner  (tail ▶ points right)
-//    Receiver (LEFT)  → sharp bottom-LEFT  corner  (tail ◀ points left)
-//    Mid-group bubbles → tail suppressed, tight inner corners used instead
-//
-//  FEATURES:
-//    • Timestamp + double-tick icon inside the bubble (bottom-right)
-//    • Sender name on first receiver bubble of a group
-//    • Staggered fade + slide-up entry (flutter_animate)
-//    • Glow shadow on sender  /  neutral lift shadow on receiver (light only)
-//    • Full light / dark mode
-//
-//  ✅ All original field names preserved — NO data or state changes.
+//  chat_bubble.dart  — FlashPay Premium Chat Bubble
+//  ✅ إصلاح مشكلة الفقاعة الكبيرة: Row التوقيت MainAxisSize.max → min
+//  ✅ إزالة IntrinsicWidth (كانت تسبب assert infinity width crash)
 // =============================================================================
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:dio/dio.dart' as dio;
+import 'package:flutter/foundation.dart' show Uint8List;
+import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Design tokens  (change visual constants here without touching logic)
-// ─────────────────────────────────────────────────────────────────────────────
 abstract final class _R {
-  static const double full = 20.0; // fully-rounded corner
-  static const double tail = 4.0;  // sharp tail corner (last in group)
-  static const double mid  = 6.0;  // inner corner when bubble is in a group
+  static const double full = 20.0;
+  static const double tail = 4.0;
+  static const double mid  = 6.0;
 
-  // ── Sender (RIGHT) ────────────────────────────────────────────────────────
-  /// Solo or last in group — tail visible bottom-right
   static const BorderRadius sSolo = BorderRadius.only(
     topLeft:     Radius.circular(full),
     topRight:    Radius.circular(full),
     bottomLeft:  Radius.circular(full),
-    bottomRight: Radius.circular(tail), // ← TAIL
+    bottomRight: Radius.circular(tail),
   );
-  /// First of a multi-bubble group — no tail yet
   static const BorderRadius sFirst = BorderRadius.only(
     topLeft:     Radius.circular(full),
     topRight:    Radius.circular(full),
     bottomLeft:  Radius.circular(full),
     bottomRight: Radius.circular(mid),
   );
-  /// Middle of a group
   static const BorderRadius sMid = BorderRadius.only(
     topLeft:     Radius.circular(full),
     topRight:    Radius.circular(mid),
     bottomLeft:  Radius.circular(full),
     bottomRight: Radius.circular(mid),
   );
-  /// Last of a multi-bubble group — tail appears
   static const BorderRadius sLast = BorderRadius.only(
     topLeft:     Radius.circular(full),
     topRight:    Radius.circular(mid),
     bottomLeft:  Radius.circular(full),
-    bottomRight: Radius.circular(tail), // ← TAIL
+    bottomRight: Radius.circular(tail),
   );
 
-  // ── Receiver (LEFT) ───────────────────────────────────────────────────────
-  /// Solo or last in group — tail visible bottom-left
   static const BorderRadius rSolo = BorderRadius.only(
-    topLeft:     Radius.circular(full),
+    topLeft:     Radius.circular(tail),
     topRight:    Radius.circular(full),
-    bottomLeft:  Radius.circular(tail), // ← TAIL
+    bottomLeft:  Radius.circular(tail),
     bottomRight: Radius.circular(full),
   );
-  /// First of a group
   static const BorderRadius rFirst = BorderRadius.only(
     topLeft:     Radius.circular(full),
     topRight:    Radius.circular(full),
     bottomLeft:  Radius.circular(mid),
     bottomRight: Radius.circular(full),
   );
-  /// Middle of a group
   static const BorderRadius rMid = BorderRadius.only(
     topLeft:     Radius.circular(mid),
     topRight:    Radius.circular(full),
     bottomLeft:  Radius.circular(mid),
     bottomRight: Radius.circular(full),
   );
-  /// Last of a group — tail appears
   static const BorderRadius rLast = BorderRadius.only(
     topLeft:     Radius.circular(mid),
     topRight:    Radius.circular(full),
-    bottomLeft:  Radius.circular(tail), // ← TAIL
+    bottomLeft:  Radius.circular(tail),
     bottomRight: Radius.circular(full),
   );
 
-  // Receiver background
-  static const Color rxBgLight    = Color(0xFFEBECF1); // warm light gray
-  static const Color rxBgDark     = Color(0xFF2C2D3F); // deep slate
-  static const Color rxTextLight  = Color(0xFF1A1A2E);
-  static const Color rxTextDark   = Color(0xFFE2E3EF);
+  static const Color rxBgLight   = Color(0xFFC75D05);
+  static const Color rxBgDark    = Color(0xFFC75D05);
+  static const Color rxTextLight = Color(0xFFEBEAEE);
+  static const Color rxTextDark  = Color(0xFFEBEAEE);
 
-  // Timestamp opacity
+  static const Color adminBgLight   = Color(0x9DFFFDFD);
+  static const Color adminBgDark    = Color(0x9DFFFDFD);
+  static const Color adminTextLight = Color(0xFF1A1A2E);
+  static const Color adminTextDark  = Color(0xFF1A1A2E);
+
   static const double tsAlpha = 0.55;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Widget
-// ─────────────────────────────────────────────────────────────────────────────
 class ChatBubble extends StatelessWidget {
-  // ✅ All original fields — unchanged names
-  final String message;
+  final String  message;
   final String? imageUrl;
-  final String senderName;
-  final bool   isMe;
-  final bool   isDark;
-  final Color  brandColor;
-
-  /// Optional "HH:mm" string displayed at the bubble foot.
-  /// Pass null to hide the timestamp row.
+  final String  senderName;
+  final bool    isMe;
+  final bool    isDark;
+  final Color   brandColor;
+  final bool    isAdmin;
   final String? timestamp;
-
-  /// UI-only grouping — no data change
-  final bool groupWithPrevious;
-  final bool groupWithNext;
-
-  /// Drives stagger animation delay (index in list)
-  final int animationIndex;
+  final bool    groupWithPrevious;
+  final bool    groupWithNext;
+  final int     animationIndex;
 
   const ChatBubble({
     Key? key,
@@ -138,18 +99,19 @@ class ChatBubble extends StatelessWidget {
     required this.isMe,
     required this.isDark,
     required this.brandColor,
+    this.isAdmin           = false,
     this.timestamp,
     this.groupWithPrevious = false,
     this.groupWithNext     = false,
     this.animationIndex    = 0,
   }) : super(key: key);
 
-  // ── Resolve the correct BorderRadius for this bubble's group position ─────
   BorderRadius _resolveRadius() {
-    final bool first = !groupWithPrevious;
-    final bool last  = !groupWithNext;
+    final bool onRight = isMe;
+    final bool first   = !groupWithPrevious;
+    final bool last    = !groupWithNext;
 
-    if (isMe) {
+    if (onRight) {
       if (first && last) return _R.sSolo;
       if (first)         return _R.sFirst;
       if (last)          return _R.sLast;
@@ -164,69 +126,68 @@ class ChatBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ── Colours ───────────────────────────────────────────────────────────
-    final Color textColor = isMe
-        ? Colors.white
-        : (isDark ? _R.rxTextDark : _R.rxTextLight);
+    final Color bubbleBg;
+    final Color textColor;
+    Gradient? bubbleGradient;
 
-    final Color rxBg = isDark ? _R.rxBgDark : _R.rxBgLight;
+    if (isMe) {
+      bubbleGradient = LinearGradient(
+        colors: [
+          Color.lerp(brandColor, Colors.white, 0.18)!,
+          brandColor,
+          Color.lerp(brandColor, Colors.black, 0.18)!,
+        ],
+        begin: Alignment.topLeft,
+        end:   Alignment.bottomRight,
+      );
+      bubbleBg  = brandColor;
+      textColor = Colors.white;
+    } else if (isAdmin) {
+      bubbleBg  = isDark ? _R.adminBgDark  : _R.adminBgLight;
+      textColor = isDark ? _R.adminTextDark : _R.adminTextLight;
+    } else {
+      bubbleBg  = isDark ? _R.rxBgDark  : _R.rxBgLight;
+      textColor = isDark ? _R.rxTextDark : _R.rxTextLight;
+    }
 
-    // ── Drop shadows (suppressed in dark mode) ────────────────────────────
     final List<BoxShadow> shadow = isDark
         ? []
         : [
-            BoxShadow(
-              color: isMe
-                  ? brandColor.withOpacity(0.28) // warm glow on sender
-                  : Colors.black.withOpacity(0.06),
-              blurRadius:   isMe ? 18 : 10,
-              spreadRadius: 0,
-              offset: const Offset(0, 4),
-            ),
-          ];
+      BoxShadow(
+        color: isMe
+            ? brandColor.withOpacity(0.30)
+            : isAdmin
+            ? const Color(0xFF7C3AED).withOpacity(0.15)
+            : Colors.black.withOpacity(0.07),
+        blurRadius:   isMe ? 20 : 10,
+        spreadRadius: 0,
+        offset: const Offset(0, 4),
+      ),
+    ];
 
-    // ── Stagger delay (cap at 400 ms) ─────────────────────────────────────
-    final int delayMs = (animationIndex * 35).clamp(0, 400);
-
-    // ── Vertical spacing ──────────────────────────────────────────────────
-    final double bottomGap = groupWithNext ? 3.0 : 10.0;
-    final double topGap    = groupWithPrevious ? 0.0 : 2.0;
+    final int    delayMs   = (animationIndex * 35).clamp(0, 400);
+    final double bottomGap = groupWithNext     ? 3.0  : 10.0;
+    final double topGap    = groupWithPrevious ? 0.0  : 2.0;
 
     return Align(
-      // ✅ WHATSAPP CONVENTION (UI only — data untouched):
-      //   isMe == true  → RIGHT (my messages)
-      //   isMe == false → LEFT  (other person)
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         margin: EdgeInsets.only(
           top:    topGap,
           bottom: bottomGap,
-          left:   isMe ? 52.0 : 0.0,  // push sender away from left edge
-          right:  isMe ? 0.0  : 52.0, // push receiver away from right edge
+          left:   isMe ? 52.0 : 0.0,
+          right:  isMe ? 0.0  : 52.0,
         ),
         constraints: BoxConstraints(
           maxWidth: MediaQuery.of(context).size.width * 0.72,
         ),
+        // ✅ الديكور مباشرة على Container — بدون IntrinsicWidth
         decoration: BoxDecoration(
-          // Sender  → 3-stop brand gradient for identity + depth
-          // Receiver → flat neutral for maximum readability
-          gradient: isMe
-              ? LinearGradient(
-                  colors: [
-                    Color.lerp(brandColor, Colors.white, 0.10)!,
-                    brandColor,
-                    Color.lerp(brandColor, Colors.black, 0.14)!,
-                  ],
-                  begin: Alignment.topLeft,
-                  end:   Alignment.bottomRight,
-                )
-              : null,
-          color:        isMe ? null : rxBg,
+          gradient:     isMe ? bubbleGradient : null,
+          color:        isMe ? null : bubbleBg,
           borderRadius: _resolveRadius(),
           boxShadow:    shadow,
         ),
-
-        // ── Bubble content ────────────────────────────────────────────────
         child: Padding(
           padding: const EdgeInsets.fromLTRB(13, 9, 13, 8),
           child: Column(
@@ -234,63 +195,106 @@ class ChatBubble extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
 
-              // ── Sender name (receiver only, first in group) ─────────────
+              // ── اسم المرسل ────────────────────────────────────────────────
               if (!isMe && !groupWithPrevious) ...[
-                Text(
-                  senderName,
-                  style: TextStyle(
-                    fontSize:      11,
-                    fontWeight:    FontWeight.w700,
-                    letterSpacing: 0.3,
-                    color: textColor.withOpacity(0.58),
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isAdmin) ...[
+                      Icon(
+                        Icons.support_agent_rounded,
+                        size:  12,
+                        color: textColor.withOpacity(0.70),
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                    Text(
+                      senderName,
+                      style: TextStyle(
+                        fontSize:      11,
+                        fontWeight:    FontWeight.w700,
+                        letterSpacing: 0.3,
+                        color: isAdmin
+                            ? (isDark
+                            ? const Color(0xFF050505)
+                            : const Color(0xFF6D28D9))
+                            : textColor.withOpacity(0.58),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 3),
               ],
-              // ✅ ── عرض الصورة إن وجدت ──
+
+              // ── الصورة ────────────────────────────────────────────────────
               if (imageUrl != null && imageUrl!.isNotEmpty) ...[
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    imageUrl!, // تأكد أن الـ Backend يرسل الرابط كاملاً (Full URL) أو قم بإضافة الـ Base URL هنا
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return const SizedBox(
-                        height: 150,
-                        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                      );
-                    },
-                    errorBuilder: (_, __, ___) => const SizedBox(
-                      height: 150,
-                      child: Center(child: Icon(Icons.broken_image_rounded, color: Colors.grey)),
+                GestureDetector(
+                  onTap: () => Navigator.of(context).push(
+                    PageRouteBuilder(
+                      opaque: false,
+                      barrierColor: Colors.black,
+                      pageBuilder: (_, __, ___) =>
+                          _FullScreenImageViewer(imageUrl: imageUrl!),
+                      transitionsBuilder: (_, anim, __, child) =>
+                          FadeTransition(opacity: anim, child: child),
+                    ),
+                  ),
+                  child: Hero(
+                    tag: imageUrl!,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        imageUrl!,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return SizedBox(
+                            height: 150,
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: isMe ? Colors.white70 : brandColor,
+                              ),
+                            ),
+                          );
+                        },
+                        errorBuilder: (_, __, ___) => const SizedBox(
+                          height: 150,
+                          child: Center(
+                            child: Icon(Icons.broken_image_rounded,
+                                color: Colors.grey),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
-                if (message.isNotEmpty) const SizedBox(height: 6), // مسافة إذا كان هناك صورة ونص معاً
+                if (message.isNotEmpty) const SizedBox(height: 6),
               ],
 
-              // ── Message text (الكود الأصلي) ─────────────
+              // ── النص ──────────────────────────────────────────────────────
               if (message.isNotEmpty)
-              Text(
-                message,
-                style: TextStyle(
-                  fontSize:   14.5,
-                  height:     1.50,
-                  color:      textColor,
-                  fontWeight: FontWeight.w400,
+                Text(
+                  message,
+                  style: TextStyle(
+                    fontSize:   14.5,
+                    height:     1.50,
+                    color:      textColor,
+                    fontWeight: FontWeight.w400,
+                  ),
                 ),
-              ),
 
-              // ── Timestamp + tick icon ───────────────────────────────────
+              // ── التوقيت + علامة الإرسال ────────────────────────────────────
               if (timestamp != null) ...[
                 const SizedBox(height: 4),
                 Row(
-                  mainAxisSize:      MainAxisSize.max,
+                  // ✅ الإصلاح الحقيقي لمشكلة الفقاعة الكبيرة
+                  // كان MainAxisSize.max → يجبر الفقاعة على أخذ كامل العرض
+                  // الآن MainAxisSize.min → الفقاعة تأخذ حجم محتواها فقط
+                  mainAxisSize:      MainAxisSize.min,
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    // Double-tick only on sender (me) bubbles
                     if (isMe) ...[
                       Icon(
                         Icons.done_all_rounded,
@@ -311,24 +315,246 @@ class ChatBubble extends StatelessWidget {
                   ],
                 ),
               ],
-
             ],
           ),
         ),
       ),
     )
-    // ── Staggered fade + slide-up entry animation ──────────────────────────
-    .animate()
-    .fadeIn(
+        .animate()
+        .fadeIn(
       delay:    Duration(milliseconds: delayMs),
       duration: const Duration(milliseconds: 300),
       curve:    Curves.easeOut,
     )
-    .slideY(
+        .slideY(
       begin:    0.10,
       delay:    Duration(milliseconds: delayMs),
       duration: const Duration(milliseconds: 300),
       curve:    Curves.easeOut,
+    );
+  }
+}
+// =============================================================================
+//  _FullScreenImageViewer
+//  شاشة عرض الصورة بالكامل مع إمكانية التكبير والحفظ
+// =============================================================================
+class _FullScreenImageViewer extends StatefulWidget {
+  final String imageUrl;
+
+  const _FullScreenImageViewer({required this.imageUrl});
+
+  @override
+  State<_FullScreenImageViewer> createState() => _FullScreenImageViewerState();
+}
+
+class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
+  final TransformationController _transformCtrl = TransformationController();
+  bool _isSaving = false;
+  bool _savedSuccess = false;
+
+  @override
+  void dispose() {
+    _transformCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveImage() async {
+    if (_isSaving) return;
+    setState(() { _isSaving = true; _savedSuccess = false; });
+
+    try {
+      // تنزيل الصورة كـ bytes ثم حفظها مباشرة بدون ملف مؤقت
+      final response = await dio.Dio().get<List<int>>(
+        widget.imageUrl,
+        options: dio.Options(responseType: dio.ResponseType.bytes),
+      );
+
+      final result = await ImageGallerySaverPlus.saveImage(
+        Uint8List.fromList(response.data!),
+        quality: 100,
+        name: 'flashpay_${DateTime.now().millisecondsSinceEpoch}',
+      );
+
+      final bool isSuccess = result is Map
+          ? result['isSuccess'] == true
+          : result == true;
+
+      if (isSuccess) {
+        setState(() { _savedSuccess = true; });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Row(
+                children: [
+                  Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                  SizedBox(width: 8),
+                  Text('تم حفظ الصورة في الاستديو ✅'),
+                ],
+              ),
+              backgroundColor: const Color(0xFF16A34A),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              margin: const EdgeInsets.all(16),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      } else {
+        throw Exception('فشل الحفظ');
+      }
+    } catch (e) {
+      if (mounted) {
+        print(  "Save Image Error: $e");
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.error_rounded, color: Colors.white, size: 18),
+                SizedBox(width: 8),
+                Text('فشل حفظ الصورة، حاول مرة أخرى'),
+              ],
+            ),
+            backgroundColor: const Color(0xFFDC2626),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() { _isSaving = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      extendBodyBehindAppBar: true,
+
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.50),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.arrow_back_ios_new_rounded,
+                color: Colors.white, size: 18),
+          ),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: GestureDetector(
+              onTap: _saveImage,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: _savedSuccess
+                      ? const Color(0xFF16A34A)
+                      : Colors.black.withOpacity(0.55),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                    color: _savedSuccess
+                        ? const Color(0xFF16A34A)
+                        : Colors.white.withOpacity(0.25),
+                    width: 1.2,
+                  ),
+                ),
+                child: _isSaving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _savedSuccess
+                                ? Icons.check_rounded
+                                : Icons.download_rounded,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            _savedSuccess ? 'تم الحفظ' : 'حفظ',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
+          ),
+        ],
+      ),
+
+      body: Center(
+        child: InteractiveViewer(
+          transformationController: _transformCtrl,
+          minScale: 0.8,
+          maxScale: 5.0,
+          child: Hero(
+            tag: widget.imageUrl,
+            child: Image.network(
+              widget.imageUrl,
+              fit: BoxFit.contain,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Center(
+                  child: CircularProgressIndicator(
+                    value: loadingProgress.expectedTotalBytes != null
+                        ? loadingProgress.cumulativeBytesLoaded /
+                            loadingProgress.expectedTotalBytes!
+                        : null,
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                );
+              },
+              errorBuilder: (_, __, ___) => const Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.broken_image_rounded,
+                      color: Colors.white38, size: 64),
+                  SizedBox(height: 12),
+                  Text('تعذّر تحميل الصورة',
+                      style: TextStyle(color: Colors.white38)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+
+      // زر إعادة الضبط عند التكبير
+      floatingActionButton: AnimatedBuilder(
+        animation: _transformCtrl,
+        builder: (_, __) {
+          final isZoomed = _transformCtrl.value != Matrix4.identity();
+          if (!isZoomed) return const SizedBox.shrink();
+          return FloatingActionButton.small(
+            backgroundColor: Colors.black54,
+            onPressed: () => _transformCtrl.value = Matrix4.identity(),
+            child: const Icon(Icons.zoom_out_map_rounded,
+                color: Colors.white, size: 20),
+          );
+        },
+      ),
     );
   }
 }
