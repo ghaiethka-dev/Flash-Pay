@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:lottie/lottie.dart'; // استيراد مكتبة Lottie
+import 'package:lottie/lottie.dart'; 
 import '../../controllers/auth_controller.dart';
 import '../../core/constants.dart';
 
@@ -9,30 +9,29 @@ class LoginScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 👈 معرفة الثيم الحالي لتحديد الألوان بذكاء
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: AppColors.darkBackground,
+        // 🚀 السطر السحري للخلفية:
+        backgroundColor: context.theme.scaffoldBackgroundColor,
         body: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24.0),
             child: Container(
               padding: const EdgeInsets.all(32.0),
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16.0),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
+                color: context.theme.cardColor, // 👈 لون البطاقة يتجاوب مع الثيم
+                borderRadius: BorderRadius.circular(24.0),
+                boxShadow: isDark 
+                    ? [] // إخفاء الظل في الدارك مود لجمالية أكبر
+                    : [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 20, offset: const Offset(0, 10))],
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // استبدال الأيقونة بملف الـ Lottie
                   Lottie.asset(
                     'images/CryptoWallet.json',
                     height: 160,
@@ -40,18 +39,19 @@ class LoginScreen extends StatelessWidget {
                     animate: true,
                   ),
                   const SizedBox(height: 16),
-                  const Text(
+                  Text(
                     "FlashPay",
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87),
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87), // 👈
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     "نظام إدارة الحوالات المالية",
-                    style: TextStyle(fontSize: 14, color: Colors.grey),
+                    style: TextStyle(fontSize: 14, color: isDark ? Colors.white70 : Colors.grey), // 👈
                   ),
                   const SizedBox(height: 32),
 
                   _buildTextField(
+                    context: context, // نمرر الـ context لمعرفة الثيم بداخل الدالة
                     label: "البريد الإلكتروني *",
                     hint: "example@flashpay.com",
                     icon: Icons.email_outlined,
@@ -60,6 +60,7 @@ class LoginScreen extends StatelessWidget {
                   const SizedBox(height: 16),
 
                   Obx(() => _buildTextField(
+                        context: context,
                         label: "كلمة المرور *",
                         hint: "أدخل كلمة المرور",
                         icon: Icons.lock_outline,
@@ -75,14 +76,14 @@ class LoginScreen extends StatelessWidget {
                     height: 50,
                     decoration: BoxDecoration(
                       gradient: AppColors.primaryGradient,
-                      borderRadius: BorderRadius.circular(8.0),
+                      borderRadius: BorderRadius.circular(12.0),
                     ),
                     child: ElevatedButton(
                       onPressed: () => authController.login(),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.transparent,
                         shadowColor: Colors.transparent,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
                       ),
                       child: Obx(() => authController.isLoading.value
                           ? const CircularProgressIndicator(color: Colors.white)
@@ -105,10 +106,10 @@ class LoginScreen extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text("ليس لديك حساب؟"),
+                      Text("ليس لديك حساب؟", style: TextStyle(color: isDark ? Colors.white70 : Colors.black87)), // 👈
                       TextButton(
                         onPressed: () => Get.toNamed('/register'),
-                        child: Text("إنشاء حساب", style: TextStyle(color: AppColors.primaryGradient.colors.first)),
+                        child: Text("إنشاء حساب", style: TextStyle(color: AppColors.primaryGradient.colors.first, fontWeight: FontWeight.bold)),
                       ),
                     ],
                   )
@@ -122,6 +123,7 @@ class LoginScreen extends StatelessWidget {
   }
 
   Widget _buildTextField({
+    required BuildContext context,
     required String label,
     required String hint,
     required IconData icon,
@@ -130,36 +132,41 @@ class LoginScreen extends StatelessWidget {
     bool isObscured = false,
     VoidCallback? onTogglePassword,
   }) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+        Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
         const SizedBox(height: 8),
         TextFormField(
           controller: controller,
           obscureText: isObscured,
+          style: TextStyle(color: isDark ? Colors.white : Colors.black87), // 👈 لون نص الإدخال
           decoration: InputDecoration(
+            filled: true,
+            fillColor: isDark ? context.theme.scaffoldBackgroundColor : Colors.white, // 👈 خلفية الحقل
             hintText: hint,
-            hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+            hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.grey.shade400, fontSize: 13),
             suffixIcon: Icon(icon, color: AppColors.primaryGradient.colors.first),
             prefixIcon: isPassword
                 ? IconButton(
-                    icon: Icon(isObscured ? Icons.visibility_off : Icons.visibility, color: Colors.grey),
+                    icon: Icon(isObscured ? Icons.visibility_off : Icons.visibility, color: isDark ? Colors.white54 : Colors.grey),
                     onPressed: onTogglePassword,
                   )
                 : null,
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8.0),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(12.0),
+              borderSide: BorderSide(color: context.theme.dividerColor), // 👈
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8.0),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(12.0),
+              borderSide: BorderSide(color: context.theme.dividerColor), // 👈
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8.0),
-              borderSide: BorderSide(color: AppColors.primaryGradient.colors.first),
+              borderRadius: BorderRadius.circular(12.0),
+              borderSide: BorderSide(color: AppColors.primaryGradient.colors.first, width: 1.5),
             ),
           ),
         ),
