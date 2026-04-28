@@ -52,7 +52,7 @@ class LoginScreen extends StatelessWidget {
 
                   _buildTextField(
                     context: context, // نمرر الـ context لمعرفة الثيم بداخل الدالة
-                    label: "البريد الإلكتروني *",
+                    label: "البريد الإلكتروني ",
                     hint: "example@flashpay.com",
                     icon: Icons.email_outlined,
                     controller: authController.loginEmailController,
@@ -61,7 +61,7 @@ class LoginScreen extends StatelessWidget {
 
                   Obx(() => _buildTextField(
                         context: context,
-                        label: "كلمة المرور *",
+                        label: "كلمة المرور ",
                         hint: "أدخل كلمة المرور",
                         icon: Icons.lock_outline,
                         controller: authController.loginPasswordController,

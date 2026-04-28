@@ -162,7 +162,7 @@ class BankTransferTab extends StatelessWidget {
           // ── اسم البنك ──
           _buildField(
             context: context,
-            label: 'اسم البنك *',
+            label: 'اسم البنك ',
             hint: 'مثال: بنك سوريا والمهجر',
             icon: Icons.account_balance_outlined,
             controller: ctrl.bankNameController,
@@ -173,7 +173,7 @@ class BankTransferTab extends StatelessWidget {
           // ── رقم الحساب ──
           _buildField(
             context: context,
-            label: 'رقم الحساب البنكي *',
+            label: 'رقم الحساب البنكي ',
             hint: 'أدخل رقم الحساب كاملاً',
             icon: Icons.credit_card_rounded,
             controller: ctrl.accountNumberController,
@@ -185,10 +185,19 @@ class BankTransferTab extends StatelessWidget {
           // ── الاسم الكامل ──
           _buildField(
             context: context,
-            label: 'الاسم الكامل لصاحب الحساب *',
+            label: 'الاسم الكامل لصاحب الحساب ',
             hint: 'أدخل الاسم الثلاثي',
             icon: Icons.person_outline_rounded,
             controller: ctrl.fullNameController,
+            isDark: isDark,
+          ),
+          const SizedBox(height: 14),
+          _buildField(
+            context: context,
+            label: 'اسم المستلم (المستفيد الفعلي) ',
+            hint: 'أدخل الاسم الثلاثي للمستلم',
+            icon: Icons.person_pin_rounded,
+            controller: ctrl.recipientNameController,
             isDark: isDark,
           ),
           const SizedBox(height: 14),
@@ -196,7 +205,7 @@ class BankTransferTab extends StatelessWidget {
           // ── رقم الموبايل ──
           _buildField(
             context: context,
-            label: 'رقم الموبايل *',
+            label: 'رقم الموبايل ',
             hint: 'مثال: 0991234567',
             icon: Icons.phone_android_rounded,
             controller: ctrl.phoneController,
@@ -205,15 +214,161 @@ class BankTransferTab extends StatelessWidget {
           ),
           const SizedBox(height: 14),
 
-          // ── المبلغ ──
-          _buildField(
-            context: context,
-            label: 'المبلغ (USD) *',
-            hint: 'أدخل المبلغ المراد تحويله',
-            icon: Icons.attach_money_rounded,
-            controller: ctrl.amountController,
-            keyboardType: TextInputType.number,
+          // ── المبلغ + العملة ──
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                flex: 3,
+                child: _buildField(
+                  context: context,
+                  label: 'المبلغ ',
+                  hint: 'أدخل المبلغ',
+                  icon: Icons.attach_money_rounded,
+                  controller: ctrl.amountController,
+                  keyboardType: TextInputType.number,
+                  isDark: isDark,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'عملة الإرسال ',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white70 : const Color(0xFF374151),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Obx(() => DropdownButtonFormField<int>(
+                      value: ctrl.selectedCurrencyId.value,
+                      hint: Text('العملة',
+                          style: TextStyle(color: isDark ? Colors.white30 : Colors.grey.shade400, fontSize: 13)),
+                      items: ctrl.currencies.map((c) {
+                        return DropdownMenuItem<int>(
+                          value: c['id'] as int,
+                          child: Text(
+                            c['code']?.toString() ?? c['name']?.toString() ?? '',
+                            style: TextStyle(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (val) => ctrl.selectedCurrencyId.value = val,
+                      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF2563EB)),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFF9FAFB),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: isDark ? Colors.white12 : const Color(0xFFE5E7EB)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: isDark ? Colors.white12 : const Color(0xFFE5E7EB)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF2563EB), width: 2),
+                        ),
+                      ),
+                    )),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // ── بطاقة القيمة بالدولار ──
+          Obx(() {
+            if (ctrl.equivalentUsd.value == '0.00' || ctrl.selectedCurrencyId.value == null) {
+              return const SizedBox.shrink();
+            }
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              margin: const EdgeInsets.only(bottom: 4),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(isDark ? 0.15 : 0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.green.withOpacity(0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('القيمة بالدولار:',
+                          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 13)),
+                      Obx(() => Text(
+                        '${ctrl.equivalentUsd.value} USD',
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: Colors.green),
+                      )),
+                    ],
+                  ),
+                  Obx(() {
+                    if (ctrl.appliedRateLabel.value.isEmpty) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.layers_outlined, size: 13, color: Colors.green),
+                            const SizedBox(width: 4),
+                            Text(ctrl.appliedRateLabel.value,
+                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.green)),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            );
+          }),
+          const SizedBox(height: 14),
+
+          // ── الدولة الوجهة ──
+          _buildDropdownField(
+            label: 'الدولة الوجهة ',
+            icon: Icons.flag_rounded,
+            hint: 'اختر الدولة',
+            value: ctrl.selectedCountry,
+            items: ctrl.countries,
             isDark: isDark,
+            onChanged: (val) {
+              ctrl.selectedCountry.value = val ?? '';
+              ctrl.selectedCity.value = '';
+            },
+          ),
+          const SizedBox(height: 14),
+
+          // ── المدينة الوجهة ──
+          Obx(() => ctrl.selectedCountry.value.isEmpty
+              ? const SizedBox.shrink()
+              : _buildDropdownField(
+            label: 'المدينة الوجهة',
+            icon: Icons.location_city_rounded,
+            hint: 'اختر المدينة',
+            value: ctrl.selectedCity,
+            items: ctrl.citiesByCountry[ctrl.selectedCountry.value] ?? ['أخرى'],
+            isDark: isDark,
+            onChanged: (val) => ctrl.selectedCity.value = val ?? '',
+          ),
           ),
           const SizedBox(height: 14),
 
@@ -243,21 +398,21 @@ class BankTransferTab extends StatelessWidget {
               ),
               child: ctrl.isLoading.value
                   ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
-                    )
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+              )
                   : const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.send_rounded, color: Colors.white, size: 20),
-                        SizedBox(width: 8),
-                        Text(
-                          'إرسال طلب التحويل',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white),
-                        ),
-                      ],
-                    ),
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'إرسال طلب التحويل',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white),
+                  ),
+                ],
+              ),
             )),
           ),
         ],
@@ -319,7 +474,76 @@ class BankTransferTab extends StatelessWidget {
     );
   }
 }
-
+// ── حقل القائمة المنسدلة (Dropdown) ──
+Widget _buildDropdownField({
+  required String label,
+  required IconData icon,
+  required String hint,
+  required RxString value, // استخدام RxString الخاص بـ GetX
+  required List<String> items,
+  required bool isDark,
+  required Function(String?) onChanged,
+}) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          color: isDark ? Colors.white70 : const Color(0xFF374151),
+        ),
+      ),
+      const SizedBox(height: 8),
+      Obx(() => DropdownButtonFormField<String>(
+        value: value.value.isEmpty ? null : value.value,
+        items: items.map((item) {
+          return DropdownMenuItem<String>(
+            value: item,
+            child: Text(item,
+                style: TextStyle(
+                    fontSize: 14,
+                    color: isDark ? Colors.white : Colors.black87)),
+          );
+        }).toList(),
+        onChanged: onChanged,
+        icon: const Icon(Icons.keyboard_arrow_down_rounded,
+            color: Color(0xFF2563EB)),
+        decoration: InputDecoration(
+          filled: true,
+          fillColor: isDark
+              ? Colors.white.withOpacity(0.05)
+              : const Color(0xFFF9FAFB),
+          hintText: hint,
+          hintStyle: TextStyle(
+              color: isDark ? Colors.white30 : Colors.grey.shade400,
+              fontSize: 13),
+          prefixIcon: Icon(icon, color: const Color(0xFF2563EB), size: 20),
+          contentPadding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+                color: isDark ? Colors.white12 : const Color(0xFFE5E7EB)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+                color: isDark ? Colors.white12 : const Color(0xFFE5E7EB)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide:
+            const BorderSide(color: Color(0xFF2563EB), width: 1.5),
+          ),
+        ),
+        dropdownColor: isDark ? const Color(0xFF1F2937) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+      )),
+    ],
+  );
+}
 // ─────────────────────────────────────────────────────────────────────────────
 //  قائمة الطلبات السابقة
 // ─────────────────────────────────────────────────────────────────────────────
@@ -384,7 +608,7 @@ class _BankTransferList extends StatelessWidget {
     return Column(
       children: List.generate(
         3,
-        (_) => Container(
+            (_) => Container(
           margin: const EdgeInsets.only(bottom: 10),
           height: 90,
           decoration: BoxDecoration(

@@ -364,7 +364,7 @@ class _SafeHistoryRow extends StatelessWidget {
                       fontWeight: FontWeight.w500),
                 ),
                 // ربح الحوالة إن وُجد
-                if (t['fee']  > 0) ...[
+                if ((double.tryParse(t['fee']?.toString() ?? '0') ?? 0) > 0) ...[
                   const SizedBox(height: 2),
                   Text(
                     'ربح: \$${double.tryParse(t['fee'].toString())?.toStringAsFixed(2) ?? '0.00'}',

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:lottie/lottie.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
 import '../../controllers/auth_controller.dart';
 import '../../core/constants.dart';
 
@@ -9,7 +10,6 @@ class RegisterScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // جلب الدول والمدن عند فتح الشاشة
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (authController.countries.isEmpty) {
         authController.fetchCountriesAndCities();
@@ -73,7 +73,7 @@ class RegisterScreen extends StatelessWidget {
 
                   _buildTextField(
                     context: context,
-                    label: "الاسم الكامل *",
+                    label: "الاسم الكامل ",
                     hint: "أدخل اسمك الثلاثي",
                     icon: Icons.person_outline,
                     controller: authController.fullNameController,
@@ -82,23 +82,18 @@ class RegisterScreen extends StatelessWidget {
 
                   _buildTextField(
                     context: context,
-                    label: "البريد الإلكتروني *",
+                    label: "البريد الإلكتروني ",
                     hint: "مثال: email@domain.com",
                     icon: Icons.email_outlined,
                     controller: authController.registerEmailController,
                   ),
                   const SizedBox(height: 16),
 
-                  _buildTextField(
-                    context: context,
-                    label: "رقم الهاتف *",
-                    hint: "مثال: 0591234567",
-                    icon: Icons.phone_outlined,
-                    controller: authController.registerPhoneController,
-                  ),
+                  // ✅ حقل رقم الهاتف مع كود الدولة
+                  _buildPhoneField(context, isDark),
                   const SizedBox(height: 16),
 
-                  // ✅ قوائم الدولة والمدينة — تُجلب من الـ API
+                  // قوائم الدولة والمدينة
                   Obx(() {
                     if (authController.isLoadingCountries.value) {
                       return const Padding(
@@ -108,11 +103,10 @@ class RegisterScreen extends StatelessWidget {
                     }
                     return Row(
                       children: [
-                        // قائمة الدول
                         Expanded(
                           child: Obx(() => _buildApiDropdown<int>(
                             context: context,
-                            label: "البلد *",
+                            label: "البلد ",
                             hint: "اختر البلد",
                             icon: Icons.public,
                             value: authController.selectedCountryId.value,
@@ -137,11 +131,10 @@ class RegisterScreen extends StatelessWidget {
                           )),
                         ),
                         const SizedBox(width: 16),
-                        // قائمة المدن — تتصفى حسب الدولة المختارة
                         Expanded(
                           child: Obx(() => _buildApiDropdown<int>(
                             context: context,
-                            label: "المدينة *",
+                            label: "المدينة ",
                             hint: "اختر المدينة",
                             icon: Icons.location_city,
                             value: authController.selectedCityId.value,
@@ -172,7 +165,7 @@ class RegisterScreen extends StatelessWidget {
 
                   Obx(() => _buildTextField(
                     context: context,
-                    label: "كلمة المرور *",
+                    label: "كلمة المرور ",
                     hint: "أدخل كلمة مرور قوية",
                     icon: Icons.lock_outline,
                     controller: authController.registerPasswordController,
@@ -184,7 +177,7 @@ class RegisterScreen extends StatelessWidget {
 
                   Obx(() => _buildTextField(
                     context: context,
-                    label: "تأكيد كلمة المرور *",
+                    label: "تأكيد كلمة المرور ",
                     hint: "أعد إدخال كلمة المرور",
                     icon: Icons.lock_reset,
                     controller:
@@ -197,105 +190,8 @@ class RegisterScreen extends StatelessWidget {
                   )),
                   const SizedBox(height: 32),
 
-                  // رفع صورة الهوية
-                  Obx(() {
-                    final img = authController.idCardImage.value;
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'صورة الهوية *',
-                          style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: isDark ? Colors.white : Colors.black87),
-                        ),
-                        const SizedBox(height: 8),
-                        GestureDetector(
-                          onTap: authController.pickIdCardImage,
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            width: double.infinity,
-                            height: img != null ? 160 : 100,
-                            decoration: BoxDecoration(
-                              color: img != null
-                                  ? Colors.transparent
-                                  : (isDark
-                                  ? context.theme.scaffoldBackgroundColor
-                                  : Colors.grey.shade50),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: img != null
-                                    ? AppColors.primaryGradient.colors.first
-                                    : context.theme.dividerColor,
-                                width: img != null ? 2 : 1.5,
-                              ),
-                            ),
-                            child: img != null
-                                ? Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: Image.file(img, fit: BoxFit.cover),
-                                ),
-                                Positioned(
-                                  top: 8,
-                                  left: 8,
-                                  child: GestureDetector(
-                                    onTap: () => authController
-                                        .idCardImage.value = null,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(4),
-                                      decoration: const BoxDecoration(
-                                        color: Colors.red,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(Icons.close,
-                                          color: Colors.white, size: 16),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            )
-                                : Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.add_photo_alternate_outlined,
-                                    size: 36,
-                                    color: isDark
-                                        ? Colors.white54
-                                        : AppColors
-                                        .primaryGradient.colors.first),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'اضغط لرفع صورة الهوية',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: isDark
-                                        ? Colors.white70
-                                        : AppColors
-                                        .primaryGradient.colors.first,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'صورة واضحة للهوية الشخصية',
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      color: isDark
-                                          ? Colors.white38
-                                          : Colors.grey),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-                    );
-                  }),
+                  // ✅ قسم صور الهوية الثلاث
+                  _buildIdImagesSection(context, isDark),
 
                   const SizedBox(height: 16),
                   Container(
@@ -353,6 +249,302 @@ class RegisterScreen extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  // ✅ حقل الهاتف الدولي
+  Widget _buildPhoneField(BuildContext context, bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'رقم الهاتف ',
+          style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : Colors.black87),
+        ),
+        const SizedBox(height: 8),
+        Directionality(
+          // IntlPhoneField يعمل بـ LTR دائماً لأن الأرقام LTR
+          textDirection: TextDirection.ltr,
+          child: IntlPhoneField(
+            controller: authController.registerPhoneController,
+            initialCountryCode: 'SY',
+            keyboardType: TextInputType.phone,
+            style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+            dropdownTextStyle:
+            TextStyle(color: isDark ? Colors.white : Colors.black87),
+            dropdownIcon: Icon(Icons.arrow_drop_down,
+                color: isDark ? Colors.white54 : Colors.grey),
+            decoration: InputDecoration(
+              hintText: '912 345 678',
+              hintStyle: TextStyle(
+                  color: isDark ? Colors.white38 : Colors.grey.shade400,
+                  fontSize: 13),
+              filled: true,
+              fillColor:
+              isDark ? context.theme.scaffoldBackgroundColor : Colors.white,
+              contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                  borderSide: BorderSide(color: context.theme.dividerColor)),
+              enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                  borderSide: BorderSide(color: context.theme.dividerColor)),
+              focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                  borderSide: BorderSide(
+                      color: AppColors.primaryGradient.colors.first,
+                      width: 1.5)),
+              errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                  borderSide:
+                  const BorderSide(color: Colors.red, width: 1.5)),
+            ),
+            // ✅ نحفظ الرقم الكامل (كود الدولة + الرقم) في الكنترولر
+            onChanged: (phone) {
+              authController.setRegisterPhone(phone.completeNumber);
+            },
+            onCountryChanged: (country) {
+              // إعادة حساب الرقم الكامل عند تغيير الدولة
+              final current = authController.registerPhoneController.text;
+              if (current.isNotEmpty) {
+                authController
+                    .setRegisterPhone('+${country.dialCode}$current');
+              }
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ✅ قسم صور الهوية الثلاث
+  Widget _buildIdImagesSection(BuildContext context, bool isDark) {
+    return Obx(() {
+      final images = authController.idCardImages;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.badge_outlined,
+                  size: 20,
+                  color: isDark
+                      ? Colors.white70
+                      : AppColors.primaryGradient.colors.first),
+              const SizedBox(width: 8),
+              Text(
+                'صور الهوية ',
+                style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : Colors.black87),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'يرجى رفع الصور الثلاث للتحقق من هويتك',
+            style: TextStyle(
+                fontSize: 12,
+                color: isDark ? Colors.white38 : Colors.grey.shade500),
+          ),
+          const SizedBox(height: 16),
+
+          // الصورة الأولى — صورة شخصية مع الهوية (عرض كامل)
+          _buildSingleImagePicker(
+            context: context,
+            isDark: isDark,
+            index: 0,
+            image: images[0],
+            heightIfEmpty: 120,
+          ),
+          const SizedBox(height: 12),
+
+          // الصورتان الثانية والثالثة — جنباً إلى جنب
+          Row(
+            children: [
+              Expanded(
+                child: _buildSingleImagePicker(
+                  context: context,
+                  isDark: isDark,
+                  index: 1,
+                  image: images[1],
+                  heightIfEmpty: 110,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildSingleImagePicker(
+                  context: context,
+                  isDark: isDark,
+                  index: 2,
+                  image: images[2],
+                  heightIfEmpty: 110,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // مؤشر الاكتمال
+          _buildImagesProgressIndicator(isDark),
+        ],
+      );
+    });
+  }
+
+  Widget _buildSingleImagePicker({
+    required BuildContext context,
+    required bool isDark,
+    required int index,
+    required dynamic image, // File?
+    required double heightIfEmpty,
+  }) {
+    final accentColor = AppColors.primaryGradient.colors.first;
+    final label = authController.imageLabel(index);
+    final icon = authController.imageIcon(index);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white70 : Colors.black54),
+        ),
+        const SizedBox(height: 6),
+        GestureDetector(
+          onTap: () => authController.pickIdCardImage(index),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: double.infinity,
+            height: image != null ? (index == 0 ? 160 : 120) : heightIfEmpty,
+            decoration: BoxDecoration(
+              color: image != null
+                  ? Colors.transparent
+                  : (isDark
+                  ? context.theme.scaffoldBackgroundColor
+                  : Colors.grey.shade50),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: image != null
+                    ? accentColor
+                    : context.theme.dividerColor,
+                width: image != null ? 2 : 1.5,
+              ),
+            ),
+            child: image != null
+                ? Stack(
+              fit: StackFit.expand,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.file(image, fit: BoxFit.cover),
+                ),
+                // زر الحذف
+                Positioned(
+                  top: 6,
+                  left: 6,
+                  child: GestureDetector(
+                    onTap: () => authController.removeIdCardImage(index),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.close,
+                          color: Colors.white, size: 14),
+                    ),
+                  ),
+                ),
+                // زر التغيير
+                Positioned(
+                  bottom: 6,
+                  right: 6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.edit, color: Colors.white, size: 12),
+                        SizedBox(width: 4),
+                        Text('تغيير',
+                            style: TextStyle(
+                                color: Colors.white, fontSize: 11)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            )
+                : Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon,
+                    size: index == 0 ? 36 : 28,
+                    color: isDark ? Colors.white38 : accentColor),
+                const SizedBox(height: 6),
+                Text(
+                  'اضغط لرفع الصورة',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? Colors.white54 : accentColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // مؤشر الاكتمال (كم صورة تم رفعها)
+  Widget _buildImagesProgressIndicator(bool isDark) {
+    final uploaded = authController.idCardImages
+        .where((img) => img != null)
+        .length;
+    final color = uploaded == 3
+        ? Colors.green
+        : AppColors.primaryGradient.colors.first;
+
+    return Row(
+      children: [
+        ...List.generate(3, (i) {
+          final done = authController.idCardImages[i] != null;
+          return Expanded(
+            child: Container(
+              margin: EdgeInsets.only(left: i < 2 ? 6 : 0),
+              height: 4,
+              decoration: BoxDecoration(
+                color: done ? color : (isDark ? Colors.white12 : Colors.grey.shade200),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          );
+        }),
+        const SizedBox(width: 10),
+        Text(
+          '$uploaded / 3',
+          style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: uploaded == 3 ? Colors.green : (isDark ? Colors.white54 : Colors.grey)),
+        ),
+      ],
     );
   }
 
@@ -416,7 +608,6 @@ class RegisterScreen extends StatelessWidget {
     );
   }
 
-  // Dropdown يعمل بأي نوع T (int للـ IDs)
   Widget _buildApiDropdown<T>({
     required BuildContext context,
     required String label,

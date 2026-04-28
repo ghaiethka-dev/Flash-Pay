@@ -385,8 +385,13 @@ class _TransferCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double amountUsd = double.tryParse(t['amount_in_usd']?.toString() ?? '0') ?? 0;
-    final double fee = double.tryParse(t['fee']?.toString() ?? '0') ?? 0;
+    final double amountUsd =
+        double.tryParse(t['amount_in_usd']?.toString() ?? '0') ?? 0;
+
+    // ✅ اقرأ agent_profit بدل fee
+    final double agentProfit =
+        double.tryParse(t['agent_profit']?.toString() ?? '0') ?? 0;
+
     final String tracking = t['tracking_code'] ?? '#${t['id']}';
     final String receiver = t['receiver_name'] ?? '—';
 
@@ -430,14 +435,19 @@ class _TransferCard extends StatelessWidget {
                   tracking,
                   style: TextStyle(color: isDark ? Colors.white54 : Colors.grey.shade500, fontSize: 11, fontWeight: FontWeight.w500),
                 ),
-                if (fee > 0) ...[
+                if (agentProfit > 0) ...[
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(Icons.attach_money_rounded, color: Color(0xFF10B981), size: 13),
+                      const Icon(Icons.attach_money_rounded,
+                          color: Color(0xFF10B981), size: 13),
                       Text(
-                        'ربحي: \$${fee.toStringAsFixed(2)}',
-                        style: const TextStyle(color: Color(0xFF10B981), fontSize: 11, fontWeight: FontWeight.w600),
+                        'ربحي: \$${agentProfit.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          color: Color(0xFF10B981),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),

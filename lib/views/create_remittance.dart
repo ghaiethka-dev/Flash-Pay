@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
 import '../controllers/create_remittance_controller.dart';
 
 class CreateRemittanceView extends StatelessWidget {
@@ -52,7 +53,7 @@ class CreateRemittanceView extends StatelessWidget {
                       flex: 2,
                       child: _buildTextField(
                         context: context,
-                        label: 'المبلغ *',
+                        label: 'المبلغ ',
                         hint: 'مثال: 500',
                         icon: null,
                         controller: controller.amountController,
@@ -64,7 +65,7 @@ class CreateRemittanceView extends StatelessWidget {
                       flex: 1,
                       child: _buildDropdownField(
                         context: context,
-                        label: 'عملة الإرسال *',
+                        label: 'عملة الإرسال ',
                         hint: 'العملة',
                         value: controller.selectedSendCurrency.value,
                         items: controller.currencies,
@@ -101,7 +102,6 @@ class CreateRemittanceView extends StatelessWidget {
                           ),
                         ],
                       ),
-                      // شارة الشريحة المطبّقة
                       if (controller.appliedRateLabel.value.isNotEmpty) ...[
                         const SizedBox(height: 8),
                         Container(
@@ -118,11 +118,7 @@ class CreateRemittanceView extends StatelessWidget {
                               const SizedBox(width: 5),
                               Text(
                                 controller.appliedRateLabel.value,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.green,
-                                ),
+                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.green),
                               ),
                             ],
                           ),
@@ -135,12 +131,44 @@ class CreateRemittanceView extends StatelessWidget {
 
                 _buildDropdownField(
                   context: context,
-                  label: 'عملة الاستلام (للمستلم) *',
+                  label: 'عملة الاستلام (للمستلم) ',
                   hint: 'اختر العملة التي سيستلم بها',
                   value: controller.selectedReceiveCurrency.value,
                   items: controller.currencies,
                   onChanged: (val) => controller.selectedReceiveCurrency.value = val,
                 ),
+                const SizedBox(height: 12),
+
+                // ── مبلغ عملة الاستلام ──
+                Obx(() {
+                  if (controller.receiveEquivalent.value == '0.00' ||
+                      controller.selectedReceiveCurrency.value == null) {
+                    return const SizedBox.shrink();
+                  }
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(isDark ? 0.15 : 0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'المبلغ بعملة الاستلام:',
+                          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange, fontSize: 14),
+                        ),
+                        Text(
+                          '${controller.receiveEquivalent.value} ${controller.receiveRateLabel.value}',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.orange),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
                 const SizedBox(height: 32),
 
                 // ── قسم الوجهة ──
@@ -149,7 +177,7 @@ class CreateRemittanceView extends StatelessWidget {
 
                 _buildDropdownField(
                   context: context,
-                  label: 'مكتب الاستلام *',
+                  label: 'مكتب الاستلام ',
                   hint: 'اختر المكتب الوجهة',
                   value: controller.selectedOffice.value,
                   items: controller.offices,
@@ -157,10 +185,9 @@ class CreateRemittanceView extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
 
-                // ── dropdown المحافظة ──
                 _buildStringDropdownField(
                   context: context,
-                  label: 'المحافظة *',
+                  label: 'المحافظة ',
                   hint: 'اختر المحافظة السورية',
                   value: controller.selectedGovernorate.value,
                   items: CreateRemittanceController.syrianGovernorates,
@@ -174,21 +201,15 @@ class CreateRemittanceView extends StatelessWidget {
 
                 _buildTextField(
                   context: context,
-                  label: 'اسم المستلم الكامل *',
+                  label: 'اسم المستلم الكامل ',
                   hint: 'أدخل اسم المستلم الثلاثي',
                   icon: Icons.person_outline,
                   controller: controller.receiverNameController,
                 ),
                 const SizedBox(height: 16),
 
-                _buildTextField(
-                  context: context,
-                  label: 'رقم هاتف المستلم *',
-                  hint: 'أدخل رقم هاتف المستلم',
-                  icon: Icons.phone_android,
-                  controller: controller.receiverPhoneController,
-                  keyboardType: TextInputType.phone,
-                ),
+                // ✅ حقل هاتف المستلم الدولي
+                _buildPhoneField(context, isDark, controller),
                 const SizedBox(height: 40),
 
                 // ── زر الإرسال ──
@@ -219,7 +240,71 @@ class CreateRemittanceView extends StatelessWidget {
     );
   }
 
-  // ── عنوان القسم ──
+  // ✅ حقل الهاتف الدولي للمستلم
+  Widget _buildPhoneField(BuildContext context, bool isDark,
+      CreateRemittanceController controller) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'رقم هاتف المستلم ',
+          style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : Colors.black87),
+        ),
+        const SizedBox(height: 8),
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: IntlPhoneField(
+            controller: controller.receiverPhoneController,
+            initialCountryCode: 'SY',
+            keyboardType: TextInputType.phone,
+            style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+            dropdownTextStyle:
+            TextStyle(color: isDark ? Colors.white : Colors.black87),
+            dropdownIcon: Icon(Icons.arrow_drop_down,
+                color: isDark ? Colors.white54 : Colors.grey),
+            decoration: InputDecoration(
+              hintText: '912 345 678',
+              hintStyle: TextStyle(
+                  color: isDark ? Colors.white38 : Colors.grey.shade400,
+                  fontSize: 13),
+              filled: true,
+              fillColor: context.theme.cardColor,
+              contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: context.theme.dividerColor)),
+              enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: context.theme.dividerColor)),
+              focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide:
+                  const BorderSide(color: _accent, width: 1.5)),
+              errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide:
+                  const BorderSide(color: Colors.red, width: 1.5)),
+            ),
+            onChanged: (phone) {
+              controller.setReceiverPhone(phone.completeNumber);
+            },
+            onCountryChanged: (country) {
+              final current = controller.receiverPhoneController.text;
+              if (current.isNotEmpty) {
+                controller
+                    .setReceiverPhone('+${country.dialCode}$current');
+              }
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _sectionTitle(String title, bool isDark) => Text(
     title,
     style: TextStyle(
@@ -229,7 +314,6 @@ class CreateRemittanceView extends StatelessWidget {
     ),
   );
 
-  // ── حقل نص ──
   Widget _buildTextField({
     required BuildContext context,
     required String label,
@@ -253,7 +337,7 @@ class CreateRemittanceView extends StatelessWidget {
             fillColor: context.theme.cardColor,
             hintText: hint,
             hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.grey.shade400, fontSize: 13),
-            suffixIcon: Icon(icon, color: _accent),
+            suffixIcon: icon != null ? Icon(icon, color: _accent) : null,
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: context.theme.dividerColor)),
             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: context.theme.dividerColor)),
@@ -264,7 +348,6 @@ class CreateRemittanceView extends StatelessWidget {
     );
   }
 
-  // ── dropdown بـ int id ──
   Widget _buildDropdownField({
     required BuildContext context,
     required String label,
@@ -304,7 +387,6 @@ class CreateRemittanceView extends StatelessWidget {
     );
   }
 
-  // ── dropdown بـ String (المحافظات) ──
   Widget _buildStringDropdownField({
     required BuildContext context,
     required String label,

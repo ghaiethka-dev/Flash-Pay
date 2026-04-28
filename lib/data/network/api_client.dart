@@ -10,8 +10,8 @@ class ApiClient {
   ApiClient() {
     BaseOptions options = BaseOptions(
       baseUrl: ApiConstants.baseUrl,
-      connectTimeout: const Duration(seconds: 30),
-      receiveTimeout: const Duration(seconds: 30),
+      connectTimeout: const Duration(seconds: 60),
+      receiveTimeout: const Duration(seconds: 60),
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
@@ -19,7 +19,7 @@ class ApiClient {
     );
 
     dio = Dio(options);
-
+    dio.interceptors.add(LogInterceptor(responseBody: true, requestBody: true));
     // إضافة Interceptor لحقن التوكن تلقائياً في الطلبات
     dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) {

@@ -6,7 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../data/local/storage_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flashpay/data/network/api_client.dart'; // سنحتاجها لتحديث التوكن بعد الدخول
+import 'package:flashpay/data/network/api_client.dart';
 
 class AuthController extends GetxController {
   final AuthRepository _authRepository = AuthRepository();
@@ -16,22 +16,19 @@ class AuthController extends GetxController {
   var isLoadingCountries = false.obs;
 
   // === قوائم الدول والمدن من الـ API ===
-  var countries = <Map<String, dynamic>>[].obs;  // [{id, name, code}, ...]
-  var cities    = <Map<String, dynamic>>[].obs;   // [{id, name, country_id}, ...]
+  var countries = <Map<String, dynamic>>[].obs;
+  var cities    = <Map<String, dynamic>>[].obs;
 
-  // ID المختار (للإرسال للـ API)
   var selectedCountryId   = RxnInt();
   var selectedCountryName = RxnString();
   var selectedCityId      = RxnInt();
   var selectedCityName    = RxnString();
 
-  // قائمة المدن المفلترة حسب الدولة
   List<Map<String, dynamic>> get availableCities {
     if (selectedCountryId.value == null) return [];
     return cities.where((c) => c['country_id'] == selectedCountryId.value).toList();
   }
 
-  // تغيير الدولة وإعادة تعيين المدينة
   void changeCountry(int? id, String? name) {
     selectedCountryId.value   = id;
     selectedCountryName.value = name;
@@ -44,7 +41,6 @@ class AuthController extends GetxController {
     selectedCityName.value = name;
   }
 
-  // جلب الدول والمدن من الـ API عند فتح صفحة التسجيل
   Future<void> fetchCountriesAndCities() async {
     isLoadingCountries.value = true;
     try {
@@ -87,20 +83,54 @@ class AuthController extends GetxController {
   var isRegisterPasswordHidden            = true.obs;
   var isConfirmRegisterPasswordHidden     = true.obs;
 
-  // صورة الهوية
-  Rx<File?> idCardImage = Rx<File?>(null);
+  // ── رقم الهاتف الكامل مع كود الدولة (يُعبّأ من IntlPhoneField) ──
+  var registerPhoneFullNumber = RxnString(); // مثال: "+963912345678"
+
+  void setRegisterPhone(String completeNumber) {
+    registerPhoneFullNumber.value = completeNumber;
+  }
+
+  // ── صور الهوية الثلاث ──
+  // 0: مع الهوية (selfie)  |  1: وجه الهوية  |  2: ظهر الهوية
+  var idCardImages = <File?>[null, null, null].obs;
   final ImagePicker _picker = ImagePicker();
 
-  Future<void> pickIdCardImage() async {
+  static const List<String> _imageLabels = [
+    'صورة شخصية مع الهوية',
+    'وجه الهوية',
+    'ظهر الهوية',
+  ];
+
+  static const List<IconData> _imageIcons = [
+    Icons.person_outlined,
+    Icons.credit_card,
+    Icons.credit_card_off_outlined,
+  ];
+
+  String imageLabel(int index) => _imageLabels[index];
+  IconData imageIcon(int index) => _imageIcons[index];
+
+  Future<void> pickIdCardImage(int index) async {
     final picked = await _picker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 85,
       maxWidth: 1200,
     );
     if (picked != null) {
-      idCardImage.value = File(picked.path);
+      final updated = List<File?>.from(idCardImages);
+      updated[index] = File(picked.path);
+      idCardImages.value = updated;
     }
   }
+
+  void removeIdCardImage(int index) {
+    final updated = List<File?>.from(idCardImages);
+    updated[index] = null;
+    idCardImages.value = updated;
+  }
+
+  // ── التحقق: هل رُفعت جميع الصور ──
+  bool get allImagesUploaded => idCardImages.every((img) => img != null);
 
   void toggleLoginPassword() =>
       isLoginPasswordHidden.value = !isLoginPasswordHidden.value;
@@ -189,29 +219,52 @@ class AuthController extends GetxController {
       return;
     }
 
-    if (idCardImage.value == null) {
-      Get.snackbar('تنبيه', 'يرجى رفع صورة الهوية',
+    // التحقق من رقم الهاتف
+    if (registerPhoneFullNumber.value == null ||
+        registerPhoneFullNumber.value!.isEmpty) {
+      Get.snackbar('تنبيه', 'يرجى إدخال رقم الهاتف',
           backgroundColor: Colors.orange, colorText: Colors.white);
+      return;
+    }
+
+    // التحقق من جميع صور الهوية
+    if (!allImagesUploaded) {
+      Get.snackbar(
+        'تنبيه',
+        'يرجى رفع جميع صور الهوية الثلاث (صورة شخصية مع الهوية، وجه الهوية، ظهر الهوية)',
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 4),
+      );
       return;
     }
 
     isLoading.value = true;
     try {
-      // ✅ جلب الـ FCM Token من الجهاز
       String? fcmToken = await FirebaseMessaging.instance.getToken();
-      // ✅ نرسل country_id و city_id مباشرة (أرقام صحيحة من الـ API)
+
       final formData = dio.FormData.fromMap({
         'name':       fullNameController.text.trim(),
         'email':      registerEmailController.text.trim(),
-        'phone':      registerPhoneController.text.trim(),
+        // ✅ نرسل الرقم الكامل مع كود الدولة
+        'phone':      registerPhoneFullNumber.value!.trim(),
         'password':   registerPasswordController.text,
         'role':       'customer',
         'country_id': selectedCountryId.value,
         'city_id':    selectedCityId.value,
-        'fcm_token':  fcmToken ?? '', // ✅ إضافة التوكن هنا
-        'id_card_image': await dio.MultipartFile.fromFile(
-          idCardImage.value!.path,
-          filename: 'id_card.jpg',
+        'fcm_token':  fcmToken ?? '',
+        // ✅ ثلاث صور منفصلة
+        'selfie_with_id': await dio.MultipartFile.fromFile(
+          idCardImages[0]!.path,
+          filename: 'selfie_with_id.jpg',
+        ),
+        'id_card_front': await dio.MultipartFile.fromFile(
+          idCardImages[1]!.path,
+          filename: 'id_card_front.jpg',
+        ),
+        'id_card_back': await dio.MultipartFile.fromFile(
+          idCardImages[2]!.path,
+          filename: 'id_card_back.jpg',
         ),
       });
 
@@ -226,7 +279,6 @@ class AuthController extends GetxController {
       String errorMessage = 'فشل إنشاء الحساب';
       debugPrint('Laravel Error: $e');
       if (e.response?.statusCode == 422) {
-        // ✅ استخراج أول خطأ من الـ validation errors إن وجد
         final errors = e.response?.data['errors'];
         if (errors != null && errors is Map) {
           errorMessage = (errors.values.first as List).first.toString();

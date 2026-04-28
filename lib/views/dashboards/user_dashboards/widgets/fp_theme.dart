@@ -10,6 +10,8 @@
 // =============================================================================
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/widgets.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  COLOURS
@@ -44,7 +46,8 @@ abstract final class FPColors {
 abstract final class FPTextStyles {
   // App-bar / hero title
   static const TextStyle brandTitle = TextStyle(
-    color: Colors.white,
+
+    color: Color(0xFF000000),
     fontSize: 22,
     fontWeight: FontWeight.w800,
     letterSpacing: 1.6,

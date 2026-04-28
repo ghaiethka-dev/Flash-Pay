@@ -40,22 +40,16 @@ class AgentDashboardController extends GetxController {
       final data = safeResponse.data['data'];
 
       agentSafeBalance.value =
-          double.tryParse(data['balance'].toString()) ?? 0.0;
+          double.tryParse(data['balance']?.toString() ?? '0') ?? 0.0;
       agentProfitTotal.value =
-          double.tryParse(data['agent_profit'].toString()) ?? 0.0;
+          double.tryParse(data['agent_profit']?.toString() ?? '0') ?? 0.0;
       agentProfitRatio.value =
-          double.tryParse(data['agent_profit_ratio'].toString()) ?? 0.0;
+          double.tryParse(data['agent_profit_ratio']?.toString() ?? '0') ?? 0.0;
 
-      // سجل الحوالات من نفس الـ endpoint
+      // ✅ لا فلتر — اعرض كل الحوالات
       final transfersList = data['transfers'] as List? ?? [];
       safeTransfers.assignAll(
-        transfersList
-            .where((t) =>
-        t['status'] == 'approved' ||
-            t['status'] == 'waiting' ||
-            t['status'] == 'ready')
-            .cast<Map<String, dynamic>>()
-            .toList(),
+        transfersList.cast<Map<String, dynamic>>().toList(),
       );
     } catch (e) {
       print('Error fetching agent safe: $e');
@@ -67,6 +61,7 @@ class AgentDashboardController extends GetxController {
   void changeTabIndex(int index) {
     selectedIndex.value = index;
     if (index == 0) fetchAgentTransfers();
+    // الصندوق يُفتح كـ BottomSheet مستقل — لا داعي لتحديثه عند تغيير التبويب
     if (index == 3 && Get.isRegistered<ProfileController>()) {
       Get.find<ProfileController>().fetchProfileData();
     }

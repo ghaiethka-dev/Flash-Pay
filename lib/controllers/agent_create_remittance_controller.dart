@@ -3,12 +3,6 @@ import 'package:get/get.dart';
 import 'package:dio/dio.dart';
 import '../data/network/api_client.dart';
 
-/// كنترولر إرسال الحوالة الخاص بالوكيل
-/// الفرق عن الزبون:
-///   • يختار مكتب التسليم
-///   • عملة الاستلام: دولار أو ليرة سورية فقط
-///   • الأموال تذهب إلى super_safe
-///   • نسبة من fee تُضاف تلقائياً إلى صندوق المندوب (يحسبها الباك)
 class AgentCreateRemittanceController extends GetxController {
   final ApiClient _apiClient = ApiClient();
 
@@ -19,25 +13,25 @@ class AgentCreateRemittanceController extends GetxController {
   final receiverNameController = TextEditingController();
   final receiverPhoneController = TextEditingController();
 
-  // عملة الإرسال (كل العملات)
+  // ✅ الرقم الكامل مع كود الدولة — يُعبّأ من IntlPhoneField
+  var receiverPhoneFullNumber = RxnString();
+
+  void setReceiverPhone(String completeNumber) {
+    receiverPhoneFullNumber.value = completeNumber;
+  }
+
   var selectedSendCurrency = RxnInt();
-
-  // عملة الاستلام — ثابتة: دولار أو ليرة فقط
-  // 'usd' أو 'syp'
   var selectedReceiveCurrencyCode = RxnString();
-
   var selectedGovernorate = RxnString();
-
-  // مكتب التسليم
   var selectedOfficeId = RxnInt();
   var offices = <Map<String, dynamic>>[].obs;
-
   var currencies = <Map<String, dynamic>>[].obs;
 
   var equivalentUsd = '0.00'.obs;
   var appliedRateLabel = ''.obs;
+  var receiveEquivalent = '0.00'.obs;
+  var receiveRateLabel = ''.obs;
 
-  // عملتا الاستلام الثابتتان
   static const List<Map<String, String>> receiveCurrencies = [
     {'code': 'usd', 'name': 'دولار أمريكي (USD)'},
     {'code': 'syp', 'name': 'ليرة سورية (SYP)'},
@@ -67,6 +61,7 @@ class AgentCreateRemittanceController extends GetxController {
     fetchInitialData();
     amountController.addListener(_recalculate);
     ever(selectedSendCurrency, (_) => _recalculate());
+    ever(selectedReceiveCurrencyCode, (_) => _recalculate());
   }
 
   void _recalculate() {
@@ -88,8 +83,30 @@ class AgentCreateRemittanceController extends GetxController {
     if (currency.isEmpty) return;
 
     final result = _getEffectiveRate(currency, amount);
-    equivalentUsd.value = (amount * (result['rate'] as double)).toStringAsFixed(2);
+    final usdAmount = amount * (result['rate'] as double);
+    equivalentUsd.value = usdAmount.toStringAsFixed(2);
     appliedRateLabel.value = result['label'] as String;
+
+    if (selectedReceiveCurrencyCode.value != null) {
+      final receiveCode = selectedReceiveCurrencyCode.value!.toUpperCase();
+      if (receiveCode == 'USD') {
+        receiveEquivalent.value = usdAmount.toStringAsFixed(2);
+        receiveRateLabel.value = 'USD';
+      } else if (receiveCode == 'SYP') {
+        final sypCurrency = currencies.firstWhere(
+              (c) => (c['code'] ?? '').toString().toUpperCase().contains('SYP'),
+          orElse: () => {},
+        );
+        if (sypCurrency.isNotEmpty) {
+          final sypRate = double.tryParse(sypCurrency['price']?.toString() ?? '1') ?? 1.0;
+          receiveEquivalent.value = (usdAmount / sypRate).toStringAsFixed(0);
+          receiveRateLabel.value = 'SYP';
+        }
+      }
+    } else {
+      receiveEquivalent.value = '0.00';
+      receiveRateLabel.value = '';
+    }
   }
 
   Map<String, dynamic> _getEffectiveRate(
@@ -137,7 +154,6 @@ class AgentCreateRemittanceController extends GetxController {
         _apiClient.dio.get('/offices'),
       ]);
 
-      // عملات الإرسال
       final currencyRes = results[0];
       if (currencyRes.statusCode == 200) {
         final raw = currencyRes.data is List
@@ -146,7 +162,6 @@ class AgentCreateRemittanceController extends GetxController {
         currencies.assignAll(List<Map<String, dynamic>>.from(raw));
       }
 
-      // المكاتب
       final officesRes = results[1];
       if (officesRes.statusCode == 200) {
         final raw = officesRes.data is List
@@ -165,8 +180,7 @@ class AgentCreateRemittanceController extends GetxController {
 
   Future<void> submitTransfer() async {
     if (amountController.text.isEmpty ||
-        receiverNameController.text.isEmpty ||
-        receiverPhoneController.text.isEmpty) {
+        receiverNameController.text.isEmpty) {
       Get.snackbar('تنبيه', 'يرجى تعبئة جميع الحقول النصية',
           backgroundColor: Colors.orange, colorText: Colors.white);
       return;
@@ -191,9 +205,14 @@ class AgentCreateRemittanceController extends GetxController {
           backgroundColor: Colors.orange, colorText: Colors.white);
       return;
     }
+    // ✅ التحقق من رقم الهاتف الكامل
+    if (receiverPhoneFullNumber.value == null ||
+        receiverPhoneFullNumber.value!.isEmpty) {
+      Get.snackbar('تنبيه', 'يرجى إدخال رقم هاتف المستلم',
+          backgroundColor: Colors.orange, colorText: Colors.white);
+      return;
+    }
 
-    // تحديد currency_id لعملة الاستلام
-    // نبحث في قائمة العملات عن USD أو SYP
     final receiveCode = selectedReceiveCurrencyCode.value!.toUpperCase();
     final receiveCurrency = currencies.firstWhere(
           (c) =>
@@ -221,8 +240,8 @@ class AgentCreateRemittanceController extends GetxController {
           'destination_office_id': selectedOfficeId.value,
           'destination_city': selectedGovernorate.value,
           'receiver_name': receiverNameController.text.trim(),
-          'receiver_phone': receiverPhoneController.text.trim(),
-
+          // ✅ الرقم الكامل مع كود الدولة
+          'receiver_phone': receiverPhoneFullNumber.value!.trim(),
         },
       );
 
@@ -259,12 +278,15 @@ class AgentCreateRemittanceController extends GetxController {
     amountController.clear();
     receiverNameController.clear();
     receiverPhoneController.clear();
+    receiverPhoneFullNumber.value = null;
     selectedSendCurrency.value = null;
     selectedReceiveCurrencyCode.value = null;
     selectedOfficeId.value = null;
     selectedGovernorate.value = null;
     equivalentUsd.value = '0.00';
     appliedRateLabel.value = '';
+    receiveEquivalent.value = '0.00';
+    receiveRateLabel.value = '';
   }
 
   @override

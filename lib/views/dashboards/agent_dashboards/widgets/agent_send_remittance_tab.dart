@@ -9,6 +9,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
 
 import 'package:flashpay/core/constants.dart';
 import '../../../../controllers/agent_create_remittance_controller.dart';
@@ -56,7 +57,7 @@ class AgentSendRemittanceTab extends StatelessWidget {
                     flex: 2,
                     child: _buildTextField(
                       context: context,
-                      label: '*',
+                      label: '',
                       hint: 'مثال: 500',
                       icon: null,
                       controller: controller.amountController,
@@ -69,7 +70,7 @@ class AgentSendRemittanceTab extends StatelessWidget {
                     flex: 1,
                     child: Obx(() => _buildCurrencyDropdown(
                       context: context,
-                      label: 'عملة الإرسال *',
+                      label: 'عملة الإرسال ',
                       hint: 'العملة',
                       value: controller.selectedSendCurrency.value,
                       items: controller.currencies,
@@ -153,6 +154,40 @@ class AgentSendRemittanceTab extends StatelessWidget {
                 isDark: isDark,
               )).animate().fadeIn(delay: 120.ms),
 
+              const SizedBox(height: 10),
+
+              // ── مبلغ عملة الاستلام ──
+              Obx(() {
+                if (controller.receiveEquivalent.value == '0.00' ||
+                    controller.selectedReceiveCurrencyCode.value == null) {
+                  return const SizedBox.shrink();
+                }
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(isDark ? 0.15 : 0.06),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'المبلغ بعملة الاستلام:',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange, fontSize: 13),
+                      ),
+                      Text(
+                        '${controller.receiveEquivalent.value} ${controller.receiveRateLabel.value}',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.orange),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+
               const SizedBox(height: 28),
 
               // ═══════════════════════════════════════════════
@@ -175,7 +210,7 @@ class AgentSendRemittanceTab extends StatelessWidget {
               // ── المحافظة ──────────────────────────────────
               Obx(() => _buildStringDropdownField(
                 context: context,
-                label: 'المحافظة *',
+                label: 'المحافظة ',
                 hint: 'اختر المحافظة السورية',
                 value: controller.selectedGovernorate.value,
                 items: AgentCreateRemittanceController.syrianGovernorates,
@@ -193,7 +228,7 @@ class AgentSendRemittanceTab extends StatelessWidget {
 
               _buildTextField(
                 context: context,
-                label: 'اسم المستلم الكامل *',
+                label: 'اسم المستلم الكامل ',
                 hint: 'أدخل اسم المستلم الثلاثي',
                 icon: Icons.person_outline,
                 controller: controller.receiverNameController,
@@ -202,15 +237,8 @@ class AgentSendRemittanceTab extends StatelessWidget {
 
               const SizedBox(height: 14),
 
-              _buildTextField(
-                context: context,
-                label: 'رقم هاتف المستلم *',
-                hint: 'أدخل رقم هاتف المستلم',
-                icon: Icons.phone_android,
-                controller: controller.receiverPhoneController,
-                keyboardType: TextInputType.phone,
-                isDark: isDark,
-              ).animate().fadeIn(delay: 220.ms),
+              // ✅ حقل هاتف المستلم الدولي
+              _buildPhoneField(context, isDark, controller).animate().fadeIn(delay: 220.ms),
 
               const SizedBox(height: 36),
 
@@ -332,7 +360,7 @@ class AgentSendRemittanceTab extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'عملة الاستلام *',
+          'عملة الاستلام ',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.bold,
@@ -388,7 +416,7 @@ class AgentSendRemittanceTab extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'مكتب التسليم *',
+          'مكتب التسليم ',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.bold,
@@ -516,6 +544,68 @@ class AgentSendRemittanceTab extends StatelessWidget {
           ))
               .toList(),
           onChanged: onChanged,
+        ),
+      ],
+    );
+  }
+
+  // ✅ حقل الهاتف الدولي للمستلم
+  Widget _buildPhoneField(BuildContext context, bool isDark,
+      AgentCreateRemittanceController controller) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'رقم هاتف المستلم ',
+          style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : Colors.black87),
+        ),
+        const SizedBox(height: 8),
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: IntlPhoneField(
+            controller: controller.receiverPhoneController,
+            initialCountryCode: 'SY',
+            keyboardType: TextInputType.phone,
+            style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+            dropdownTextStyle:
+            TextStyle(color: isDark ? Colors.white : Colors.black87),
+            dropdownIcon: Icon(Icons.arrow_drop_down,
+                color: isDark ? Colors.white54 : Colors.grey),
+            decoration: InputDecoration(
+              hintText: '912 345 678',
+              hintStyle: TextStyle(
+                  color: isDark ? Colors.white38 : Colors.grey.shade400,
+                  fontSize: 13),
+              filled: true,
+              fillColor: context.theme.cardColor,
+              contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: context.theme.dividerColor)),
+              enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: context.theme.dividerColor)),
+              focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: _accent, width: 1.5)),
+              errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Colors.red, width: 1.5)),
+            ),
+            onChanged: (phone) {
+              controller.setReceiverPhone(phone.completeNumber);
+            },
+            onCountryChanged: (country) {
+              final current = controller.receiverPhoneController.text;
+              if (current.isNotEmpty) {
+                controller.setReceiverPhone('+${country.dialCode}$current');
+              }
+            },
+          ),
         ),
       ],
     );
