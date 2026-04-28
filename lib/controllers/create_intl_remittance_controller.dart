@@ -13,16 +13,24 @@ class CreateIntlRemittanceController extends GetxController {
   final receiverNameController = TextEditingController();
   final receiverPhoneController = TextEditingController();
 
+  // ✅ الرقم الكامل مع كود الدولة — يُعبّأ من IntlPhoneField
+  var receiverPhoneFullNumber = RxnString();
+
+  void setReceiverPhone(String completeNumber) {
+    receiverPhoneFullNumber.value = completeNumber;
+  }
+
   var selectedSendCurrency = RxnInt();
   var selectedReceiveCurrency = RxnInt();
   var selectedCountry = RxnInt();
-  var selectedCity = RxnString(); // المدينة المختارة
+  var selectedCity = RxnString();
+  var selectedOffice = RxnInt();
 
   var currencies = <Map<String, dynamic>>[].obs;
   var countries = <Map<String, dynamic>>[].obs;
-  var availableCities = <String>[].obs; // قائمة المدن التي ستتغير حسب الدولة
+  var offices = <Map<String, dynamic>>[].obs;
+  var availableCities = <String>[].obs;
 
-  // الماب الجاهز للدول ومدنها (يمكنك تعديل الأسماء لتطابق ما يرجع من السيرفر لديك)
   final Map<String, List<String>> citiesMap = {
     'سوريا': ['دمشق', 'حلب', 'حمص', 'حماة', 'اللاذقية', 'طرطوس', 'دير الزور', 'الحسكة', 'القامشلي', 'إدلب', 'السويداء', 'درعا', 'ريف دمشق', 'منبج', 'البوكمال'],
     'تركيا': ['إسطنبول', 'أنقرة', 'غازي عنتاب', 'مرسين', 'أنطاليا', 'أضنة', 'اورفا', 'بورصة'],
@@ -47,7 +55,9 @@ class CreateIntlRemittanceController extends GetxController {
   };
 
   var equivalentUsd = '0.00'.obs;
-  var appliedRateLabel = ''.obs; // الشريحة المطبّقة للعرض
+  var appliedRateLabel = ''.obs;
+  var receiveEquivalent = '0.00'.obs;
+  var receiveRateLabel = ''.obs;
 
   @override
   void onInit() {
@@ -55,9 +65,9 @@ class CreateIntlRemittanceController extends GetxController {
     fetchInitialData();
     amountController.addListener(_recalculate);
     ever(selectedSendCurrency, (_) => _recalculate());
+    ever(selectedReceiveCurrency, (_) => _recalculate());
   }
 
-  // ── حساب الدولار مع مراعاة الشرائح ──
   void _recalculate() {
     if (amountController.text.isEmpty || selectedSendCurrency.value == null) {
       equivalentUsd.value = '0.00';
@@ -77,11 +87,26 @@ class CreateIntlRemittanceController extends GetxController {
     if (currency.isEmpty) return;
 
     final result = _getEffectiveRate(currency, amount);
-    equivalentUsd.value = (amount * (result['rate'] as double)).toStringAsFixed(2);
+    final usdAmount = amount * (result['rate'] as double);
+    equivalentUsd.value = usdAmount.toStringAsFixed(2);
     appliedRateLabel.value = result['label'] as String;
+
+    if (selectedReceiveCurrency.value != null) {
+      final receiveCurrency = currencies.firstWhere(
+            (c) => c['id'] == selectedReceiveCurrency.value,
+        orElse: () => {},
+      );
+      if (receiveCurrency.isNotEmpty) {
+        final receiveResult = _getEffectiveRate(receiveCurrency, amount);
+        receiveEquivalent.value = (usdAmount / (receiveResult['rate'] as double)).toStringAsFixed(2);
+        receiveRateLabel.value = receiveCurrency['code']?.toString() ?? '';
+      }
+    } else {
+      receiveEquivalent.value = '0.00';
+      receiveRateLabel.value = '';
+    }
   }
 
-  /// يجد الشريحة المناسبة للمبلغ ويُرجع { rate, label }
   Map<String, dynamic> _getEffectiveRate(Map<String, dynamic> currency, double amount) {
     final List rates = currency['rates'] ?? [];
 
@@ -107,7 +132,6 @@ class CreateIntlRemittanceController extends GetxController {
       }
     }
 
-    // fallback: السعر الأساسي
     final double baseRate = double.tryParse(currency['price'].toString()) ?? 1.0;
     return {'rate': baseRate, 'label': 'السعر الأساسي'};
   }
@@ -115,18 +139,16 @@ class CreateIntlRemittanceController extends GetxController {
   String _fmt(double v) =>
       v.truncateToDouble() == v ? v.toInt().toString() : v.toString();
 
-  void calculateUsd() => _recalculate(); // للتوافق إن كان يُستدعى من مكان آخر
+  void calculateUsd() => _recalculate();
 
-  // دالة تُستدعى عند تغيير الدولة لجلب مدنها
   void onCountryChanged(int? countryId) {
     selectedCountry.value = countryId;
-    selectedCity.value = null; // تصفير المدينة المختارة
+    selectedCity.value = null;
 
     if (countryId != null) {
       var country = countries.firstWhere((c) => c['id'] == countryId, orElse: () => {});
       if (country.isNotEmpty) {
         String countryName = country['name'];
-        // جلب المدن، وإذا لم تكن الدولة في الماب نعرض "العاصمة" كخيار افتراضي
         availableCities.assignAll(citiesMap[countryName] ?? ['العاصمة', 'أخرى']);
       }
     } else {
@@ -137,75 +159,127 @@ class CreateIntlRemittanceController extends GetxController {
   Future<void> fetchInitialData() async {
     isFetchingData.value = true;
     try {
-      // 1. جلب العملات
-      final currencyRes = await _apiClient.dio.get('/currencies');
+      final results = await Future.wait([
+        _apiClient.dio.get('/currencies'),
+        _apiClient.dio.get('/countries'),
+        _apiClient.dio.get('/offices'),
+      ]);
+
+      final currencyRes = results[0];
+      final countryRes = results[1];
+      final officeRes = results[2];
+
       if (currencyRes.statusCode == 200) {
-        if (currencyRes.data is List) {
-          currencies.assignAll(List<Map<String, dynamic>>.from(currencyRes.data));
-        } else {
-          currencies.assignAll(List<Map<String, dynamic>>.from(currencyRes.data['data']));
-        }
+        final raw = currencyRes.data is List
+            ? currencyRes.data
+            : currencyRes.data['data'];
+        currencies.assignAll(List<Map<String, dynamic>>.from(raw));
       }
 
-      // 2. جلب الدول
-      final countryRes = await _apiClient.dio.get('/countries');
       if (countryRes.statusCode == 200) {
-        if (countryRes.data is List) {
-          countries.assignAll(List<Map<String, dynamic>>.from(countryRes.data));
-        } else {
-          countries.assignAll(List<Map<String, dynamic>>.from(countryRes.data['data']));
-        }
+        final raw = countryRes.data is List
+            ? countryRes.data
+            : countryRes.data['data'];
+        countries.assignAll(List<Map<String, dynamic>>.from(raw));
       }
 
-
+      if (officeRes.statusCode == 200) {
+        final raw = officeRes.data is List
+            ? officeRes.data
+            : officeRes.data['data'];
+        offices.assignAll(List<Map<String, dynamic>>.from(raw));
+      }
     } catch (e) {
-      print("Error fetching initial data: $e"); // لطباعة الخطأ في التيرمنال إن وجد
-      Get.snackbar('خطأ', 'فشل في جلب البيانات', backgroundColor: Colors.red, colorText: Colors.white);
+      print("Error fetching initial data: $e");
+      Get.snackbar('خطأ', 'فشل في جلب البيانات',
+          backgroundColor: Colors.red, colorText: Colors.white);
     } finally {
       isFetchingData.value = false;
     }
   }
 
   Future<void> submitTransfer() async {
-    if (amountController.text.isEmpty || receiverNameController.text.isEmpty || receiverPhoneController.text.isEmpty) {
-      Get.snackbar('تنبيه', 'يرجى تعبئة الحقول النصية', backgroundColor: Colors.orange, colorText: Colors.white);
+    if (amountController.text.isEmpty ||
+        receiverNameController.text.isEmpty) {
+      Get.snackbar('تنبيه', 'يرجى تعبئة الحقول النصية',
+          backgroundColor: Colors.orange, colorText: Colors.white);
       return;
     }
-    if (selectedSendCurrency.value == null || selectedReceiveCurrency.value == null || selectedCountry.value == null || selectedCity.value == null) {
-      Get.snackbar('تنبيه', 'يرجى اختيار العملات، الدولة، والمدينة', backgroundColor: Colors.orange, colorText: Colors.white);
+
+    // ✅ التحقق من رقم الهاتف الكامل
+    if (receiverPhoneFullNumber.value == null ||
+        receiverPhoneFullNumber.value!.isEmpty) {
+      Get.snackbar('تنبيه', 'يرجى إدخال رقم هاتف المستلم',
+          backgroundColor: Colors.orange, colorText: Colors.white);
+      return;
+    }
+
+    if (selectedSendCurrency.value == null ||
+        selectedReceiveCurrency.value == null ||
+        selectedCountry.value == null ||
+        selectedCity.value == null) {
+      Get.snackbar('تنبيه', 'يرجى اختيار العملات، الدولة، والمدينة',
+          backgroundColor: Colors.orange, colorText: Colors.white);
       return;
     }
 
     isLoading.value = true;
     try {
-      final response = await _apiClient.dio.post(
-        '/transfers',
-        data: {
-          'amount': amountController.text.trim(),
-          'send_currency_id': selectedSendCurrency.value,
-          'currency_id': selectedReceiveCurrency.value,
-          'destination_country_id': selectedCountry.value,
-          'destination_city': selectedCity.value, // إرسال اسم المدينة
-          'receiver_name': receiverNameController.text.trim(),
-          'receiver_phone': receiverPhoneController.text.trim(),
-        },
-      );
+      final Map<String, dynamic> body = {
+        'amount': amountController.text.trim(),
+        'send_currency_id': selectedSendCurrency.value,
+        'currency_id': selectedReceiveCurrency.value,
+        'destination_country_id': selectedCountry.value,
+        'destination_city': selectedCity.value,
+        'receiver_name': receiverNameController.text.trim(),
+        // ✅ الرقم الكامل مع كود الدولة
+        'receiver_phone': receiverPhoneFullNumber.value!.trim(),
+      };
+
+      if (selectedOffice.value != null) {
+        body['destination_office_id'] = selectedOffice.value;
+      }
+
+      final response = await _apiClient.dio.post('/transfers', data: body);
 
       if (response.statusCode == 201) {
-        Get.snackbar('نجاح', 'تم إرسال الحوالة الدولية بنجاح', backgroundColor: Colors.green, colorText: Colors.white);
-        amountController.clear();
-        receiverNameController.clear();
-        receiverPhoneController.clear();
-        selectedSendCurrency.value = null;
-        selectedReceiveCurrency.value = null;
-        selectedCountry.value = null;
-        selectedCity.value = null;
+        Get.snackbar(
+          'نجاح ✓',
+          'تم إرسال الحوالة الدولية بنجاح',
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 3),
+        );
+        _resetForm();
       }
     } on DioException catch (e) {
-      Get.snackbar('خطأ', 'فشل إرسال الحوالة', backgroundColor: Colors.red, colorText: Colors.white);
+      String msg = 'فشل إرسال الحوالة';
+      if (e.response?.statusCode == 422) {
+        msg = e.response?.data['message'] ?? 'تحقق من صحة البيانات';
+      }
+      Get.snackbar('خطأ', msg,
+          backgroundColor: Colors.red, colorText: Colors.white);
+      print(e.response?.data);
     } finally {
       isLoading.value = false;
     }
+  }
+
+  void _resetForm() {
+    amountController.clear();
+    receiverNameController.clear();
+    receiverPhoneController.clear();
+    receiverPhoneFullNumber.value = null;
+    selectedSendCurrency.value = null;
+    selectedReceiveCurrency.value = null;
+    selectedCountry.value = null;
+    selectedCity.value = null;
+    selectedOffice.value = null;
+    equivalentUsd.value = '0.00';
+    appliedRateLabel.value = '';
+    receiveEquivalent.value = '0.00';
+    receiveRateLabel.value = '';
+    availableCities.clear();
   }
 
   @override

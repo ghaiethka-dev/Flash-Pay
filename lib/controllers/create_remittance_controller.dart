@@ -11,20 +11,29 @@ class CreateRemittanceController extends GetxController {
 
   final amountController = TextEditingController();
   final receiverNameController = TextEditingController();
+  // ✅ لا يزال موجوداً للتحكم في الـ IntlPhoneField داخلياً إن احتجنا
   final receiverPhoneController = TextEditingController();
+
+  // ✅ الرقم الكامل مع كود الدولة — يُعبّأ من IntlPhoneField
+  var receiverPhoneFullNumber = RxnString(); // مثال: "+963912345678"
+
+  void setReceiverPhone(String completeNumber) {
+    receiverPhoneFullNumber.value = completeNumber;
+  }
 
   var selectedSendCurrency = RxnInt();
   var selectedReceiveCurrency = RxnInt();
   var selectedOffice = RxnInt();
-  var selectedGovernorate = RxnString(); // المحافظة السورية
+  var selectedGovernorate = RxnString();
 
   var currencies = <Map<String, dynamic>>[].obs;
   var offices = <Map<String, dynamic>>[].obs;
 
   var equivalentUsd = '0.00'.obs;
-  var appliedRateLabel = ''.obs; // الشريحة المطبّقة للعرض
+  var appliedRateLabel = ''.obs;
+  var receiveEquivalent = '0.00'.obs;
+  var receiveRateLabel = ''.obs;
 
-  // ── قائمة المحافظات السورية ──
   static const List<String> syrianGovernorates = [
     'دمشق',
     'ريف دمشق',
@@ -49,9 +58,9 @@ class CreateRemittanceController extends GetxController {
     fetchInitialData();
     amountController.addListener(_recalculate);
     ever(selectedSendCurrency, (_) => _recalculate());
+    ever(selectedReceiveCurrency, (_) => _recalculate());
   }
 
-  // ── حساب الدولار مع مراعاة الشرائح ──
   void _recalculate() {
     if (amountController.text.isEmpty || selectedSendCurrency.value == null) {
       equivalentUsd.value = '0.00';
@@ -71,11 +80,26 @@ class CreateRemittanceController extends GetxController {
     if (currency.isEmpty) return;
 
     final result = _getEffectiveRate(currency, amount);
-    equivalentUsd.value = (amount * (result['rate'] as double)).toStringAsFixed(2);
+    final usdAmount = amount * (result['rate'] as double);
+    equivalentUsd.value = usdAmount.toStringAsFixed(2);
     appliedRateLabel.value = result['label'] as String;
+
+    if (selectedReceiveCurrency.value != null) {
+      final receiveCurrency = currencies.firstWhere(
+            (c) => c['id'] == selectedReceiveCurrency.value,
+        orElse: () => {},
+      );
+      if (receiveCurrency.isNotEmpty) {
+        final receiveResult = _getEffectiveRate(receiveCurrency, amount);
+        receiveEquivalent.value = (usdAmount / (receiveResult['rate'] as double)).toStringAsFixed(2);
+        receiveRateLabel.value = receiveCurrency['code']?.toString() ?? '';
+      }
+    } else {
+      receiveEquivalent.value = '0.00';
+      receiveRateLabel.value = '';
+    }
   }
 
-  /// يجد الشريحة المناسبة للمبلغ ويُرجع { rate, label }
   Map<String, dynamic> _getEffectiveRate(Map<String, dynamic> currency, double amount) {
     final List rates = currency['rates'] ?? [];
 
@@ -101,7 +125,6 @@ class CreateRemittanceController extends GetxController {
       }
     }
 
-    // fallback: السعر الأساسي
     final double baseRate = double.tryParse(currency['price'].toString()) ?? 1.0;
     return {'rate': baseRate, 'label': 'السعر الأساسي'};
   }
@@ -109,7 +132,6 @@ class CreateRemittanceController extends GetxController {
   String _fmt(double v) =>
       v.truncateToDouble() == v ? v.toInt().toString() : v.toString();
 
-  // ── جلب البيانات الأولية ──
   Future<void> fetchInitialData() async {
     isFetchingData.value = true;
     try {
@@ -137,15 +159,22 @@ class CreateRemittanceController extends GetxController {
     }
   }
 
-  // ── إرسال الحوالة ──
   Future<void> submitTransfer() async {
     if (amountController.text.isEmpty ||
-        receiverNameController.text.isEmpty ||
-        receiverPhoneController.text.isEmpty) {
+        receiverNameController.text.isEmpty) {
       Get.snackbar('تنبيه', 'يرجى تعبئة جميع الحقول النصية',
           backgroundColor: Colors.orange, colorText: Colors.white);
       return;
     }
+
+    // ✅ التحقق من رقم الهاتف الكامل
+    if (receiverPhoneFullNumber.value == null ||
+        receiverPhoneFullNumber.value!.isEmpty) {
+      Get.snackbar('تنبيه', 'يرجى إدخال رقم هاتف المستلم',
+          backgroundColor: Colors.orange, colorText: Colors.white);
+      return;
+    }
+
     if (selectedSendCurrency.value == null ||
         selectedReceiveCurrency.value == null ||
         selectedOffice.value == null ||
@@ -166,7 +195,8 @@ class CreateRemittanceController extends GetxController {
           'destination_office_id': selectedOffice.value,
           'destination_city': selectedGovernorate.value,
           'receiver_name': receiverNameController.text.trim(),
-          'receiver_phone': receiverPhoneController.text.trim(),
+          // ✅ الرقم الكامل مع كود الدولة
+          'receiver_phone': receiverPhoneFullNumber.value!.trim(),
         },
       );
 
@@ -196,12 +226,15 @@ class CreateRemittanceController extends GetxController {
     amountController.clear();
     receiverNameController.clear();
     receiverPhoneController.clear();
+    receiverPhoneFullNumber.value = null;
     selectedSendCurrency.value = null;
     selectedReceiveCurrency.value = null;
     selectedOffice.value = null;
     selectedGovernorate.value = null;
     equivalentUsd.value = '0.00';
     appliedRateLabel.value = '';
+    receiveEquivalent.value = '0.00';
+    receiveRateLabel.value = '';
   }
 
   @override

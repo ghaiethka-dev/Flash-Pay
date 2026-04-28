@@ -81,7 +81,7 @@ class _ChatAppBarState extends State<ChatAppBar>
           children: [
             const Spacer(),
             Container(
-              height: 1,
+              height: 2,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [

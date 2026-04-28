@@ -1,7 +1,6 @@
 class ApiConstants {
-  // 🔴 استبدل 192.168.1.15 بالرقم الخاص بحاسوبك الذي ظهر في الـ CMD
-  // وتأكد من كتابة http وليس https (لأنك تعمل محلياً)
-  static const String baseUrl = "http://192.168.10.80:8000/api";
+
+  static const String baseUrl = "https://flashpay-back-1.onrender.com/api";
   
   static const String loginEndpoint = "/login";
   static const String registerEndpoint = "/register";
