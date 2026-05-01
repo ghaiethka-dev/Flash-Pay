@@ -1,17 +1,11 @@
 // =============================================================================
 //  fp_theme.dart
 //  Flash Pay — Centralised Design Tokens
-//  ──────────────────────────────────────
-//  Single source of truth for every colour, text-style, shadow, and gradient
-//  used across the User Dashboard UI.
-//
-//  ✅ UI-only file — zero business logic.
-//  Usage:  FPColors.primary  |  FPTextStyles.heading  |  FPShadows.card
+//  ✅ إصلاح: brandTitle لم يكن له لون مناسب للثيمين
+//  ✅ مراجعة شاملة لجميع الأبعاد والألوان
 // =============================================================================
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
-import 'package:flutter/widgets.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  COLOURS
@@ -44,16 +38,17 @@ abstract final class FPColors {
 //  TEXT STYLES
 // ─────────────────────────────────────────────────────────────────────────────
 abstract final class FPTextStyles {
-  // App-bar / hero title
+  // ✅ brandTitle: لا يُستخدم مباشرة بعد الآن — الاسم يُعرض عبر ShaderMask
+  // في dashboard_header.dart لكن نبقيه هنا للتوافق مع أي استخدام آخر
+  // اللون أصبح أبيض (داخل الهيدر الملون دائماً)
   static const TextStyle brandTitle = TextStyle(
-
-    color: Color(0xFF000000),
+    color: Colors.white,          // ✅ أبيض دائماً — الهيدر خلفيته gradient ملون
     fontSize: 22,
-    fontWeight: FontWeight.w800,
-    letterSpacing: 1.6,
+    fontWeight: FontWeight.w900,  // ✅ w900 بدلاً من w800 لحضور أقوى
+    letterSpacing: 1.2,
   );
 
-  // Section headings
+  // Section headings — لا تُستخدم مباشرة، SectionTitle widget تتحكم بالثيم
   static const TextStyle sectionHeading = TextStyle(
     fontSize: 18,
     fontWeight: FontWeight.w800,
@@ -61,7 +56,7 @@ abstract final class FPTextStyles {
     letterSpacing: 0.2,
   );
 
-  // Card primary label
+  // Card primary label — دائماً أبيض (على خلفية gradient)
   static const TextStyle cardTitle = TextStyle(
     color: Colors.white,
     fontSize: 20,
@@ -69,20 +64,21 @@ abstract final class FPTextStyles {
     letterSpacing: 0.2,
   );
 
-  // Card sub-label
+  // Card sub-label — دائماً أبيض شفاف (على خلفية gradient)
   static TextStyle cardSubtitle = TextStyle(
     color: Colors.white.withOpacity(0.82),
     fontSize: 13,
     fontWeight: FontWeight.w500,
   );
 
-  // Greeting
+  // Greeting hint — دائماً أبيض (داخل الهيدر)
   static const TextStyle greetingHint = TextStyle(
     color: Colors.white70,
     fontSize: 15,
     fontWeight: FontWeight.w400,
   );
 
+  // Greeting name — دائماً أبيض (داخل الهيدر)
   static const TextStyle greetingName = TextStyle(
     color: Colors.white,
     fontSize: 30,
@@ -90,7 +86,7 @@ abstract final class FPTextStyles {
     letterSpacing: 0.4,
   );
 
-  // Stats strip
+  // Stats strip — دائماً أبيض (داخل الهيدر)
   static const TextStyle statValue = TextStyle(
     color: Colors.white,
     fontSize: 18,
@@ -103,14 +99,14 @@ abstract final class FPTextStyles {
     fontWeight: FontWeight.w500,
   );
 
-  // Pill badge on card
+  // Pill badge
   static const TextStyle badge = TextStyle(
     color: Colors.white,
     fontSize: 11,
     fontWeight: FontWeight.w700,
   );
 
-  // Feature pill label
+  // Feature pill label — ✅ لا تُستخدم مباشرة، _FeaturePill تقرأ الثيم
   static const TextStyle pillLabel = TextStyle(
     fontSize: 12,
     fontWeight: FontWeight.w700,
@@ -130,7 +126,6 @@ abstract final class FPTextStyles {
 //  SHADOWS
 // ─────────────────────────────────────────────────────────────────────────────
 abstract final class FPShadows {
-  // General card shadow
   static final List<BoxShadow> card = [
     BoxShadow(
       color: Colors.black.withOpacity(0.07),
@@ -140,17 +135,15 @@ abstract final class FPShadows {
     ),
   ];
 
-  // Coloured glow shadow for remittance cards
   static List<BoxShadow> cardGlow(Color color) => [
-        BoxShadow(
-          color: color.withOpacity(0.36),
-          blurRadius: 22,
-          spreadRadius: 0,
-          offset: const Offset(0, 10),
-        ),
-      ];
+    BoxShadow(
+      color: color.withOpacity(0.36),
+      blurRadius: 22,
+      spreadRadius: 0,
+      offset: const Offset(0, 10),
+    ),
+  ];
 
-  // Bottom nav bar shadow
   static final List<BoxShadow> navBar = [
     BoxShadow(
       color: Colors.black.withOpacity(0.09),
@@ -165,7 +158,6 @@ abstract final class FPShadows {
 //  GRADIENTS
 // ─────────────────────────────────────────────────────────────────────────────
 abstract final class FPGradients {
-  /// Warm brand gradient used in the hero header.
   static const LinearGradient heroHeader = LinearGradient(
     begin: Alignment.topRight,
     end: Alignment.bottomLeft,
@@ -177,14 +169,12 @@ abstract final class FPGradients {
     stops: [0.0, 0.55, 1.0],
   );
 
-  /// Domestic remittance card gradient (warm orange).
   static const LinearGradient domestic = LinearGradient(
     colors: [FPColors.accent, FPColors.primary],
     begin: Alignment.topRight,
     end: Alignment.bottomLeft,
   );
 
-  /// International remittance card gradient (blue).
   static const LinearGradient international = LinearGradient(
     colors: [FPColors.blue, FPColors.blueDark],
     begin: Alignment.topRight,

@@ -20,7 +20,9 @@ class BankTransferTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(BankTransferController());
+    final controller = Get.isRegistered<BankTransferController>()
+        ? Get.find<BankTransferController>()
+        : Get.put(BankTransferController());
     final bool isDark = context.theme.brightness == Brightness.dark;
     final Color brand = AppColors.primaryGradient.colors.first;
 
@@ -479,7 +481,7 @@ Widget _buildDropdownField({
   required String label,
   required IconData icon,
   required String hint,
-  required RxString value, // استخدام RxString الخاص بـ GetX
+  required RxString value,
   required List<String> items,
   required bool isDark,
   required Function(String?) onChanged,
@@ -496,51 +498,61 @@ Widget _buildDropdownField({
         ),
       ),
       const SizedBox(height: 8),
-      Obx(() => DropdownButtonFormField<String>(
-        value: value.value.isEmpty ? null : value.value,
-        items: items.map((item) {
-          return DropdownMenuItem<String>(
-            value: item,
-            child: Text(item,
-                style: TextStyle(
-                    fontSize: 14,
-                    color: isDark ? Colors.white : Colors.black87)),
-          );
-        }).toList(),
-        onChanged: onChanged,
-        icon: const Icon(Icons.keyboard_arrow_down_rounded,
-            color: Color(0xFF2563EB)),
-        decoration: InputDecoration(
-          filled: true,
-          fillColor: isDark
-              ? Colors.white.withOpacity(0.05)
-              : const Color(0xFFF9FAFB),
-          hintText: hint,
-          hintStyle: TextStyle(
-              color: isDark ? Colors.white30 : Colors.grey.shade400,
-              fontSize: 13),
-          prefixIcon: Icon(icon, color: const Color(0xFF2563EB), size: 20),
-          contentPadding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(
-                color: isDark ? Colors.white12 : const Color(0xFFE5E7EB)),
+      // ✅ بدون Obx لمنع إعادة بناء الـ dropdown عند تغيير القيمة
+      // نستخدم ValueKey لإعادة البناء فقط عند الضرورة
+      Obx(() {
+        final currentValue = value.value.isEmpty ? null : value.value;
+        // التحقق أن القيمة موجودة في القائمة
+        final validValue = (currentValue != null && items.contains(currentValue))
+            ? currentValue
+            : null;
+        return DropdownButtonFormField<String>(
+          key: ValueKey('${label}_${items.length}'),
+          value: validValue,
+          items: items.map((item) {
+            return DropdownMenuItem<String>(
+              value: item,
+              child: Text(item,
+                  style: TextStyle(
+                      fontSize: 14,
+                      color: isDark ? Colors.white : Colors.black87)),
+            );
+          }).toList(),
+          onChanged: onChanged,
+          icon: const Icon(Icons.keyboard_arrow_down_rounded,
+              color: Color(0xFF2563EB)),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: isDark
+                ? Colors.white.withOpacity(0.05)
+                : const Color(0xFFF9FAFB),
+            hintText: hint,
+            hintStyle: TextStyle(
+                color: isDark ? Colors.white30 : Colors.grey.shade400,
+                fontSize: 13),
+            prefixIcon: Icon(icon, color: const Color(0xFF2563EB), size: 20),
+            contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                  color: isDark ? Colors.white12 : const Color(0xFFE5E7EB)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                  color: isDark ? Colors.white12 : const Color(0xFFE5E7EB)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide:
+              const BorderSide(color: Color(0xFF2563EB), width: 1.5),
+            ),
           ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(
-                color: isDark ? Colors.white12 : const Color(0xFFE5E7EB)),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide:
-            const BorderSide(color: Color(0xFF2563EB), width: 1.5),
-          ),
-        ),
-        dropdownColor: isDark ? const Color(0xFF1F2937) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-      )),
+          dropdownColor: isDark ? const Color(0xFF1F2937) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+        );
+      }),  // ✅ إغلاق Obx
     ],
   );
 }

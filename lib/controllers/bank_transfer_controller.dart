@@ -143,6 +143,16 @@ class BankTransferController extends GetxController {
         phoneController.text.trim().isEmpty ||
         amountController.text.trim().isEmpty ||
         selectedCountry.value.isEmpty){
+
+      // ── debug: اعرف أي حقل فارغ ──
+      print("bankName: '${bankNameController.text.trim()}'");
+      print("accountNumber: '${accountNumberController.text.trim()}'");
+      print("fullName: '${fullNameController.text.trim()}'");
+      print("recipientName: '${recipientNameController.text.trim()}'");
+      print("phone: '${phoneController.text.trim()}'");
+      print("amount: '${amountController.text.trim()}'");
+      print("selectedCountry: '${selectedCountry.value}'");
+
       Get.snackbar(
         'تنبيه',
         'يرجى تعبئة جميع الحقول الإلزامية',
@@ -150,7 +160,6 @@ class BankTransferController extends GetxController {
         colorText: Colors.white,
         snackPosition: SnackPosition.TOP,
       );
-      print("#######");
       return;
     }
 

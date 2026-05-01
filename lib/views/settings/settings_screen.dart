@@ -1,26 +1,7 @@
 // =============================================================================
 //  settings_screen.dart
-//  Flash Pay — Settings Screen  (Main Entry)
-//  ───────────────────────────────────────────
+//  Flash Pay — Settings Screen
 //  Target path:  lib/views/settings/settings_screen.dart
-//
-//  Replaces the original:  lib/views/settings_view.dart
-//
-//  ✅ ALL controller logic preserved:
-//     • Get.put(AuthController())            ← unchanged registration
-//     • authController.logout()             ← called on confirm
-//     • AppColors.primaryGradient           ← used for cancel button colour
-//     • "تسجيل الخروج" confirmation dialog  ← now a premium bottom-sheet
-//       with the same text: title "تسجيل الخروج", confirm "نعم، خروج",
-//       cancel "إلغاء"
-//
-//  Component map
-//  ─────────────
-//  widgets/
-//    settings_section_card.dart   — titled card wrapper
-//    custom_settings_tile.dart    — tappable tile with icon + chevron
-//    animated_toggle_tile.dart    — tile with animated custom toggle switch
-//    logout_button.dart           — styled red outline button + bottom-sheet
 // =============================================================================
 
 import 'package:flashpay/controllers/theme_controller.dart';
@@ -28,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:flashpay/controllers/auth_controller.dart';
 
@@ -40,40 +22,42 @@ import 'widgets/settings_section_card.dart';
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({Key? key}) : super(key: key);
 
+  Future<void> _openTelegram() async {
+    final appUri = Uri.parse('tg://resolve?domain=Majdi_exchange');
+    final webUri = Uri.parse('https://t.me/Majdi_exchange');
+
+    if (await canLaunchUrl(appUri)) {
+      await launchUrl(appUri);
+    } else {
+      await launchUrl(webUri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // ✅ AuthController registration — unchanged
     final AuthController authController = Get.put(AuthController());
-    // استخدام Get.put بدلاً من find لضمان توفره دائماً
     final ThemeController themeController = Get.put(ThemeController());
-
-    // معرفة الثيم الحالي لضبط ألوان شريط الحالة (البطارية والساعة)
     final bool isDark = context.theme.brightness == Brightness.dark;
 
     return Directionality(
-      textDirection: TextDirection.rtl, // ✅ RTL preserved
+      textDirection: TextDirection.rtl,
       child: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
-          // عكس ألوان الأيقونات حسب الوضع الحالي
           statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
           statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
         ),
         child: Scaffold(
-          // 🚀 السطر السحري: الاعتماد على لون الثيم بدلاً من اللون الثابت
           backgroundColor: context.theme.scaffoldBackgroundColor,
           body: CustomScrollView(
             physics: const BouncingScrollPhysics(),
             slivers: [
-              // ── Settings page header ─────────────────────────────────────
               SliverToBoxAdapter(
                 child: const _SettingsPageHeader()
                     .animate()
                     .fadeIn(duration: 400.ms)
                     .slideY(begin: -0.06, curve: Curves.easeOut),
               ),
-
-              // ── Scrollable sections ──────────────────────────────────────
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 80),
                 sliver: SliverList(
@@ -135,35 +119,29 @@ class SettingsScreen extends StatelessWidget {
                       titleIcon: Icons.tune_rounded,
                       iconColor: FPColors.purple,
                       children: [
-                        // ======= 🚀 زر الوضع الداكن الديناميكي =======
                         Obx(() => AnimatedToggleTile(
                           icon: Icons.dark_mode_rounded,
                           iconColor: Colors.indigo,
                           title: 'الوضع الداكن (Dark Mode)',
                           subtitle: 'تغيير مظهر التطبيق بالكامل',
-                          initialValue: themeController.isDarkMode.value, 
+                          initialValue: themeController.isDarkMode.value,
                           onChanged: (bool value) {
                             themeController.toggleTheme(value);
                           },
                         )),
-                        // ==========================================
                         CustomSettingsTile(
                           icon: Icons.language_rounded,
                           iconColor: FPColors.green,
                           title: 'اللغة',
                           subtitle: 'العربية',
-                          onTap: () {
-                            // Hook up to language selector
-                          },
+                          onTap: () {},
                         ),
                         CustomSettingsTile(
                           icon: Icons.currency_exchange_rounded,
                           iconColor: FPColors.primary,
                           title: 'العملة الافتراضية',
                           subtitle: 'دولار أمريكي — USD',
-                          onTap: () {
-                            // Hook up to currency selector
-                          },
+                          onTap: () {},
                           showDivider: false,
                         ),
                       ],
@@ -180,23 +158,15 @@ class SettingsScreen extends StatelessWidget {
                       titleIcon: Icons.help_outline_rounded,
                       iconColor: FPColors.blue,
                       children: [
-                        CustomSettingsTile(
-                          icon: Icons.headset_mic_rounded,
-                          iconColor: FPColors.blue,
-                          title: 'تواصل مع الدعم',
-                          subtitle: 'متاح 24/7 لمساعدتك',
-                          onTap: () {
-                            // Hook up to support screen
-                          },
-                        ),
+                        // ── زر تيليغرام المخصص ──
+                        _TelegramSupportTile(onTap: _openTelegram),
+
                         CustomSettingsTile(
                           icon: Icons.info_outline_rounded,
                           iconColor: FPColors.textMid,
                           title: 'عن التطبيق',
                           subtitle: 'Flash Pay — الإصدار 1.0.0',
-                          onTap: () {
-                            // Hook up to about screen
-                          },
+                          onTap: () {},
                           showDivider: false,
                         ),
                       ],
@@ -207,8 +177,6 @@ class SettingsScreen extends StatelessWidget {
 
                     const SizedBox(height: 32),
 
-                    // ── Logout button ─────────────────────────────────────
-                    // ✅ authController injected — logout() called inside
                     LogoutButton(authController: authController)
                         .animate()
                         .fadeIn(delay: 520.ms, duration: 500.ms)
@@ -216,7 +184,6 @@ class SettingsScreen extends StatelessWidget {
 
                     const SizedBox(height: 12),
 
-                    // App version footnote (لون النص يتجاوب مع الدارك مود)
                     Center(
                       child: Text(
                         'Flash Pay © 2026',
@@ -226,9 +193,7 @@ class SettingsScreen extends StatelessWidget {
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                    )
-                        .animate()
-                        .fadeIn(delay: 600.ms, duration: 400.ms),
+                    ).animate().fadeIn(delay: 600.ms, duration: 400.ms),
                   ]),
                 ),
               ),
@@ -241,7 +206,82 @@ class SettingsScreen extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Private: Settings page header (gradient banner)
+//  Telegram Support Tile — تصميم مميز بلون تيليغرام
+// ─────────────────────────────────────────────────────────────────────────────
+class _TelegramSupportTile extends StatelessWidget {
+  final VoidCallback onTap;
+  const _TelegramSupportTile({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isDark = context.theme.brightness == Brightness.dark;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            // أيقونة تيليغرام
+            Container(
+              width: 40, height: 40,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1E96D0), Color(0xFF2AABEE)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(11),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF2AABEE).withOpacity(0.30),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'تواصل مع الدعم عبر تيليغرام',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '@Majdi_exchange · متاح 24/7',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontSize: 12,
+                      color: isDark ? Colors.white54 : Colors.grey.shade500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_back_ios_new_rounded,
+              size: 14,
+              color: isDark ? Colors.white38 : Colors.grey.shade400,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Settings page header
 // ─────────────────────────────────────────────────────────────────────────────
 class _SettingsPageHeader extends StatelessWidget {
   const _SettingsPageHeader();
@@ -258,7 +298,6 @@ class _SettingsPageHeader extends StatelessWidget {
       ),
       child: Stack(
         children: [
-          // Decorative circles
           Positioned(
             top: -20, right: -40,
             child: Container(
@@ -279,7 +318,6 @@ class _SettingsPageHeader extends StatelessWidget {
               ),
             ),
           ),
-          // Title row
           Row(
             children: [
               Container(
@@ -288,11 +326,7 @@ class _SettingsPageHeader extends StatelessWidget {
                   color: Colors.white.withOpacity(0.18),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Icon(
-                  Icons.settings_rounded,
-                  color: Colors.white,
-                  size: 22,
-                ),
+                child: const Icon(Icons.settings_rounded, color: Colors.white, size: 22),
               ),
               const SizedBox(width: 14),
               const Column(
@@ -301,19 +335,15 @@ class _SettingsPageHeader extends StatelessWidget {
                   Text(
                     'الإعدادات',
                     style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.4,
+                      color: Colors.white, fontSize: 22,
+                      fontWeight: FontWeight.w800, letterSpacing: 0.4,
                     ),
                   ),
                   SizedBox(height: 2),
                   Text(
                     'تحكم كامل في حسابك وتفضيلاتك',
                     style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
+                      color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
