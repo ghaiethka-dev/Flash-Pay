@@ -2,13 +2,14 @@ import 'dart:async';
 import 'package:dio/dio.dart' as dio;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../data/local/storage_service.dart';
 import '../data/network/api_client.dart';
 import '../data/network/api_constants.dart';
 
 // ==========================================
 //  BlockedScreen — صفحة الحساب المحظور
-//  FlashPay · رسالة فقط، بدون أزرار
+//  FlashPay · مع زر التواصل عبر تيليغرام
 // ==========================================
 
 class BlockedScreen extends StatefulWidget {
@@ -29,6 +30,9 @@ class _BlockedScreenState extends State<BlockedScreen>
   static const Color kTextPrimary = Color(0xFFF5EDE4);
   static const Color kTextSub     = Color(0xFF9E8878);
 
+  // لون تيليغرام
+  static const Color kTelegram    = Color(0xFF2AABEE);
+
   late final AnimationController _pulseCtrl;
   late final AnimationController _floatCtrl;
   late final AnimationController _entranceCtrl;
@@ -41,6 +45,7 @@ class _BlockedScreenState extends State<BlockedScreen>
   late final Animation<Offset> _slideTitle;
   late final Animation<double> _fadeTitle;
   late final Animation<double> _fadeCard;
+  late final Animation<double> _fadeButtons;
 
   @override
   void initState() {
@@ -57,7 +62,7 @@ class _BlockedScreenState extends State<BlockedScreen>
     _floatAnim = Tween<double>(begin: -8.0, end: 8.0).animate(
         CurvedAnimation(parent: _floatCtrl, curve: Curves.easeInOut));
 
-    _entranceCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))
+    _entranceCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600))
       ..forward();
 
     _fadeIcon = Tween<double>(begin: 0, end: 1).animate(
@@ -70,7 +75,10 @@ class _BlockedScreenState extends State<BlockedScreen>
         CurvedAnimation(parent: _entranceCtrl, curve: const Interval(0.25, 0.6, curve: Curves.easeOut)));
 
     _fadeCard = Tween<double>(begin: 0, end: 1).animate(
-        CurvedAnimation(parent: _entranceCtrl, curve: const Interval(0.5, 1.0, curve: Curves.easeOut)));
+        CurvedAnimation(parent: _entranceCtrl, curve: const Interval(0.5, 0.8, curve: Curves.easeOut)));
+
+    _fadeButtons = Tween<double>(begin: 0, end: 1).animate(
+        CurvedAnimation(parent: _entranceCtrl, curve: const Interval(0.72, 1.0, curve: Curves.easeOut)));
   }
 
   @override
@@ -123,6 +131,24 @@ class _BlockedScreenState extends State<BlockedScreen>
       }
     } on dio.DioException catch (_) {
     } catch (_) {}
+  }
+
+  Future<void> _openTelegram() async {
+    // يفتح تطبيق تيليغرام مباشرة إن وُجد، وإلا يفتح الويب
+    final appUri = Uri.parse('tg://resolve?domain=Majdi_exchange');
+    final webUri = Uri.parse('https://t.me/Majdi_exchange');
+
+    if (await canLaunchUrl(appUri)) {
+      await launchUrl(appUri);
+    } else {
+      await launchUrl(webUri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Future<void> _logout() async {
+    final storageService = Get.find<StorageService>();
+    await storageService.clearAuthData();
+    Get.offAllNamed('/login');
   }
 
   @override
@@ -279,6 +305,48 @@ class _BlockedScreenState extends State<BlockedScreen>
                                 color: kTextSub, height: 1.9,
                               ),
                             ),
+
+                            const SizedBox(height: 20),
+
+                            // ── زر التواصل عبر تيليغرام ──
+                            GestureDetector(
+                              onTap: _openTelegram,
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(vertical: 13),
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [Color(0xFF1E96D0), Color(0xFF2AABEE)],
+                                    begin: Alignment.centerRight,
+                                    end: Alignment.centerLeft,
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: kTelegram.withOpacity(0.30),
+                                      blurRadius: 16,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: const [
+                                    Icon(Icons.send_rounded, color: Colors.white, size: 18),
+                                    SizedBox(width: 10),
+                                    Text(
+                                      'تواصل معنا عبر تيليغرام',
+                                      style: TextStyle(
+                                        fontFamily: 'Cairo',
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -286,38 +354,40 @@ class _BlockedScreenState extends State<BlockedScreen>
 
                     const Spacer(flex: 3),
 
-                    // \u0632\u0631 \u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062e\u0631\u0648\u062c
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 36),
-                      child: GestureDetector(
-                        onTap: _logout,
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 15),
-                          decoration: BoxDecoration(
-                            color: Colors.transparent,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: const Color(0xFF2E1F10),
-                              width: 1.5,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Icon(Icons.logout_rounded,
-                                  color: Color(0xFF9E8878), size: 18),
-                              SizedBox(width: 8),
-                              Text(
-                                '\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062e\u0631\u0648\u062c',
-                                style: TextStyle(
-                                  fontFamily: 'Cairo',
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF9E8878),
-                                ),
+                    // زر تسجيل الخروج
+                    FadeTransition(
+                      opacity: _fadeButtons,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 36),
+                        child: GestureDetector(
+                          onTap: _logout,
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 15),
+                            decoration: BoxDecoration(
+                              color: Colors.transparent,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: const Color(0xFF2E1F10),
+                                width: 1.5,
                               ),
-                            ],
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: const [
+                                Icon(Icons.logout_rounded, color: Color(0xFF9E8878), size: 18),
+                                SizedBox(width: 8),
+                                Text(
+                                  'تسجيل الخروج',
+                                  style: TextStyle(
+                                    fontFamily: 'Cairo',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF9E8878),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -330,12 +400,6 @@ class _BlockedScreenState extends State<BlockedScreen>
         ],
       ),
     );
-  }
-
-  Future<void> _logout() async {
-    final storageService = Get.find<StorageService>();
-    await storageService.clearAuthData();
-    Get.offAllNamed('/login');
   }
 }
 
