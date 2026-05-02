@@ -1,21 +1,13 @@
 // =============================================================================
-//  splash_screen.dart
-//  Flash Pay — Splash Screen
-//  Target path:  lib/views/auth/splash_screen.dart
-//  (أو استبدل SplashScreen في main.dart بهذا الملف)
-//
-//  التصميم:
-//   • خلفية داكنة مع شبكة هندسية وتوهج برتقالي
-//   • شعار FlashPay يظهر مع أنيميشن نبضة ذهبية
-//   • أيقونة برق (⚡) متحركة في المركز
-//   • نص "تحويل فوري · آمن · موثوق" يظهر تدريجياً
-//   • شريط تقدم (Progress) في الأسفل
+//  splash_screen.dart  —  Flash Pay
+//  lib/views/auth/splash_screen.dart
 // =============================================================================
 
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../controllers/BiometricController.dart';
 import '../../data/local/storage_service.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -29,13 +21,11 @@ class _SplashScreenState extends State<SplashScreen>
     with TickerProviderStateMixin {
 
   // ── ألوان الهوية ──────────────────────────────────────────────────────────
-  static const Color kBg          = Color(0xFF080808);
-  static const Color kPrimary     = Color(0xFFA64D04);
-  static const Color kGold        = Color(0xFFECB651);
-  static const Color kGoldLight   = Color(0xFFF5D27A);
-  static const Color kSurface     = Color(0xFF141008);
-  static const Color kTextPrimary = Color(0xFFF5EDE4);
-  static const Color kTextSub     = Color(0xFF9E8878);
+  static const Color kBg        = Color(0xFF080808);   // خلفية سوداء
+  static const Color kGold      = Color(0xFFECB651);   // ذهبي أساسي
+  static const Color kGoldLight = Color(0xFFF5D27A);   // ذهبي فاتح
+  static const Color kGoldDeep  = Color(0xFFD4982A);   // ذهبي عميق
+  static const Color kTextSub   = Color(0xFF9E8878);   // نص ثانوي
 
   // ── AnimationControllers ──────────────────────────────────────────────────
   late final AnimationController _boltCtrl;
@@ -64,47 +54,68 @@ class _SplashScreenState extends State<SplashScreen>
 
   void _setupAnimations() {
     // ── Bolt entrance ──
-    _boltCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))
+    _boltCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 900))
       ..forward();
     _boltScale = TweenSequence([
-      TweenSequenceItem(tween: Tween(begin: 0.0, end: 1.15).chain(CurveTween(curve: Curves.easeOut)), weight: 60),
-      TweenSequenceItem(tween: Tween(begin: 1.15, end: 1.0).chain(CurveTween(curve: Curves.easeIn)), weight: 40),
+      TweenSequenceItem(
+          tween: Tween(begin: 0.0, end: 1.15)
+              .chain(CurveTween(curve: Curves.easeOut)),
+          weight: 60),
+      TweenSequenceItem(
+          tween: Tween(begin: 1.15, end: 1.0)
+              .chain(CurveTween(curve: Curves.easeIn)),
+          weight: 40),
     ]).animate(_boltCtrl);
     _boltGlow = Tween<double>(begin: 0, end: 1).animate(
         CurvedAnimation(parent: _boltCtrl, curve: const Interval(0.4, 1.0)));
 
     // ── Pulse rings ──
-    _pulseCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2000))
+    _pulseCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 2000))
       ..repeat();
     _pulseRing1 = Tween<double>(begin: 0.6, end: 1.4).animate(
         CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeOut));
     _pulseRing2 = Tween<double>(begin: 0.6, end: 1.4).animate(
-        CurvedAnimation(parent: _pulseCtrl, curve: const Interval(0.3, 1.0, curve: Curves.easeOut)));
+        CurvedAnimation(
+            parent: _pulseCtrl,
+            curve: const Interval(0.3, 1.0, curve: Curves.easeOut)));
 
     // ── Orbit particles ──
-    _orbitCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 4))
+    _orbitCtrl = AnimationController(
+        vsync: this, duration: const Duration(seconds: 4))
       ..repeat();
     _orbit = Tween<double>(begin: 0, end: 2 * math.pi).animate(
         CurvedAnimation(parent: _orbitCtrl, curve: Curves.linear));
 
     // ── Entrance text ──
-    _entranceCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400));
+    _entranceCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1400));
     Future.delayed(const Duration(milliseconds: 600), () {
       if (mounted) _entranceCtrl.forward();
     });
     _fadeLogoText = Tween<double>(begin: 0, end: 1).animate(
-        CurvedAnimation(parent: _entranceCtrl, curve: const Interval(0.0, 0.5, curve: Curves.easeOut)));
-    _slideLogoText = Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
-        CurvedAnimation(parent: _entranceCtrl, curve: const Interval(0.0, 0.5, curve: Curves.easeOutCubic)));
+        CurvedAnimation(
+            parent: _entranceCtrl,
+            curve: const Interval(0.0, 0.5, curve: Curves.easeOut)));
+    _slideLogoText =
+        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+            CurvedAnimation(
+                parent: _entranceCtrl,
+                curve: const Interval(0.0, 0.5, curve: Curves.easeOutCubic)));
     _fadeTagline = Tween<double>(begin: 0, end: 1).animate(
-        CurvedAnimation(parent: _entranceCtrl, curve: const Interval(0.4, 1.0, curve: Curves.easeOut)));
+        CurvedAnimation(
+            parent: _entranceCtrl,
+            curve: const Interval(0.4, 1.0, curve: Curves.easeOut)));
 
     // ── Progress bar ──
-    _progressCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2800));
+    _progressCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 2800));
     Future.delayed(const Duration(milliseconds: 400), () {
       if (mounted) _progressCtrl.forward();
     });
-    _progress = CurvedAnimation(parent: _progressCtrl, curve: Curves.easeInOut);
+    _progress =
+        CurvedAnimation(parent: _progressCtrl, curve: Curves.easeInOut);
   }
 
   Future<void> _navigate() async {
@@ -112,20 +123,31 @@ class _SplashScreenState extends State<SplashScreen>
     if (!mounted) return;
 
     final storageService = Get.find<StorageService>();
-    final token    = storageService.getToken();
-    final role     = storageService.getUserRole();
+    final token     = storageService.getToken();
+    final role      = storageService.getUserRole();
     final isBlocked = storageService.getIsBlocked();
 
-    if (token != null && token.isNotEmpty) {
-      if (isBlocked) {
-        Get.offAllNamed('/blocked');
-      } else if (role == 'agent') {
-        Get.offAllNamed('/agent_dashboard');
-      } else {
-        Get.offAllNamed('/user_dashboard');
-      }
-    } else {
+    if (token == null || token.isEmpty) {
       Get.offAllNamed('/login');
+      return;
+    }
+
+    final biometricController = Get.find<BiometricController>();
+    final bool passed = await biometricController.authenticateOnLaunch();
+
+    if (!mounted) return;
+
+    if (!passed) {
+      Get.offAllNamed('/login');
+      return;
+    }
+
+    if (isBlocked) {
+      Get.offAllNamed('/blocked');
+    } else if (role == 'agent') {
+      Get.offAllNamed('/agent_dashboard');
+    } else {
+      Get.offAllNamed('/user_dashboard');
     }
   }
 
@@ -147,22 +169,46 @@ class _SplashScreenState extends State<SplashScreen>
       backgroundColor: kBg,
       body: Stack(
         children: [
-          // ── خلفية شبكة هندسية ──────────────────────────────────────────
+
+          // ── خلفية شبكة هندسية ذهبية خفيفة ───────────────────────────────
           CustomPaint(painter: _SplashGridPainter(), size: Size.infinite),
 
-          // ── توهج علوي ──────────────────────────────────────────────────
+          // ── توهج علوي ذهبي ────────────────────────────────────────────────
           Positioned(
-            top: -size.height * 0.1,
-            left: size.width * 0.1,
-            right: size.width * 0.1,
+            top: -size.height * 0.15,
+            left: 0,
+            right: 0,
             child: AnimatedBuilder(
               animation: _boltGlow,
               builder: (_, __) => Container(
-                height: size.height * 0.4,
+                height: size.height * 0.55,
                 decoration: BoxDecoration(
                   gradient: RadialGradient(
                     colors: [
-                      kPrimary.withOpacity(0.18 * _boltGlow.value),
+                      kGold.withOpacity(0.14 * _boltGlow.value),
+                      kGoldDeep.withOpacity(0.05 * _boltGlow.value),
+                      Colors.transparent,
+                    ],
+                    stops: const [0.0, 0.5, 1.0],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // ── توهج سفلي ذهبي ────────────────────────────────────────────────
+          Positioned(
+            bottom: -size.height * 0.1,
+            left: 0,
+            right: 0,
+            child: AnimatedBuilder(
+              animation: _boltGlow,
+              builder: (_, __) => Container(
+                height: size.height * 0.35,
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    colors: [
+                      kGoldDeep.withOpacity(0.07 * _boltGlow.value),
                       Colors.transparent,
                     ],
                   ),
@@ -171,77 +217,96 @@ class _SplashScreenState extends State<SplashScreen>
             ),
           ),
 
-          // ── المحتوى المركزي ──────────────────────────────────────────
+          // ── المحتوى المركزي ──────────────────────────────────────────────
           Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
 
-                // ── الأيقونة مع الحلقات النابضة ──
+                // ── الأيقونة مع الحلقات النابضة ──────────────────────────
                 SizedBox(
-                  width: 220, height: 220,
+                  width: 240,
+                  height: 240,
                   child: AnimatedBuilder(
-                    animation: Listenable.merge([_pulseRing1, _pulseRing2, _boltScale, _orbit]),
+                    animation: Listenable.merge(
+                        [_pulseRing1, _pulseRing2, _boltScale, _orbit]),
                     builder: (_, __) {
                       return Stack(
                         alignment: Alignment.center,
                         children: [
-                          // حلقة نبضية خارجية
+
+                          // حلقة نبضية خارجية — ذهبية
                           Opacity(
-                            opacity: (1 - (_pulseRing1.value - 0.6) / 0.8).clamp(0.0, 0.5),
+                            opacity: (1 - (_pulseRing1.value - 0.6) / 0.8)
+                                .clamp(0.0, 0.45),
                             child: Container(
-                              width: 180 * _pulseRing1.value,
-                              height: 180 * _pulseRing1.value,
+                              width: 200 * _pulseRing1.value,
+                              height: 200 * _pulseRing1.value,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                border: Border.all(color: kPrimary, width: 1.5),
+                                border: Border.all(color: kGold, width: 1.5),
                               ),
                             ),
                           ),
 
-                          // حلقة نبضية داخلية
+                          // حلقة نبضية داخلية — ذهبية فاتحة
                           Opacity(
-                            opacity: (1 - (_pulseRing2.value - 0.6) / 0.8).clamp(0.0, 0.35),
+                            opacity: (1 - (_pulseRing2.value - 0.6) / 0.8)
+                                .clamp(0.0, 0.30),
                             child: Container(
-                              width: 140 * _pulseRing2.value,
-                              height: 140 * _pulseRing2.value,
+                              width: 155 * _pulseRing2.value,
+                              height: 155 * _pulseRing2.value,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                border: Border.all(color: kGold, width: 1),
+                                border: Border.all(color: kGoldLight, width: 1),
                               ),
                             ),
                           ),
 
-                          // جسيمات مدارية
+                          // جسيمات مدارية ذهبية
                           ..._buildOrbitParticles(_orbit.value),
 
-                          // الدائرة الرئيسية
+                          // ── الدائرة الذهبية الرئيسية ──
                           Transform.scale(
                             scale: _boltScale.value,
-                            child: Container(
-                              width: 110, height: 110,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: const RadialGradient(
-                                  colors: [Color(0xFF1C1008), Color(0xFF0A0703)],
+                            child: AnimatedBuilder(
+                              animation: _boltGlow,
+                              builder: (_, __) => Container(
+                                width: 112,
+                                height: 112,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  // Gradient ذهبي مشع من المركز
+                                  gradient: RadialGradient(
+                                    colors: [
+                                      kGoldLight,
+                                      kGold,
+                                      kGoldDeep,
+                                    ],
+                                    stops: const [0.0, 0.55, 1.0],
+                                    center: const Alignment(-0.2, -0.3),
+                                  ),
+                                  boxShadow: [
+                                    // هالة ذهبية متوهجة
+                                    BoxShadow(
+                                      color: kGold.withOpacity(
+                                          0.55 * _boltGlow.value),
+                                      blurRadius: 36,
+                                      spreadRadius: 4,
+                                    ),
+                                    BoxShadow(
+                                      color: kGoldDeep.withOpacity(
+                                          0.28 * _boltGlow.value),
+                                      blurRadius: 65,
+                                      spreadRadius: 12,
+                                    ),
+                                  ],
                                 ),
-                                border: Border.all(color: kPrimary.withOpacity(0.6), width: 2),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: kPrimary.withOpacity(0.5 * _boltGlow.value),
-                                    blurRadius: 40, spreadRadius: 6,
-                                  ),
-                                  BoxShadow(
-                                    color: kGold.withOpacity(0.2 * _boltGlow.value),
-                                    blurRadius: 20, spreadRadius: 2,
-                                  ),
-                                ],
-                              ),
-                              child: const Center(
-                                child: Icon(
+                                // ── أيقونة البرق سوداء داكنة داخل الذهبي ──
+                                child: const Icon(
                                   Icons.bolt_rounded,
-                                  size: 58,
-                                  color: kGoldLight,
+                                  color: Color(0xFF080808),
+                                  size: 60,
                                 ),
                               ),
                             ),
@@ -252,42 +317,53 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                 ),
 
-                const SizedBox(height: 32),
+                const SizedBox(height: 36),
 
-                // ── اسم التطبيق ──
+                // ── اسم التطبيق بـ Gradient ذهبي ─────────────────────────
                 SlideTransition(
                   position: _slideLogoText,
                   child: FadeTransition(
                     opacity: _fadeLogoText,
                     child: Column(
                       children: [
-                        // اسم التطبيق بخط ذهبي
                         ShaderMask(
                           shaderCallback: (bounds) => const LinearGradient(
-                            colors: [kGold, kGoldLight, kGold],
-                            stops: [0.0, 0.5, 1.0],
+                            colors: [
+                              kGoldDeep,
+                              kGoldLight,
+                              kGold,
+                              kGoldLight,
+                              kGoldDeep,
+                            ],
+                            stops: [0.0, 0.25, 0.5, 0.75, 1.0],
                           ).createShader(bounds),
                           child: const Text(
                             'FlashPay',
                             style: TextStyle(
                               fontFamily: 'Cairo',
-                              fontSize: 42,
+                              fontSize: 44,
                               fontWeight: FontWeight.w900,
                               color: Colors.white,
-                              letterSpacing: 1.5,
+                              letterSpacing: 2.0,
                               height: 1.0,
                             ),
                           ),
                         ),
-
-                        const SizedBox(height: 6),
-
-                        // الخط الذهبي تحت الاسم
+                        const SizedBox(height: 8),
+                        // خط ذهبي أسفل الاسم
                         Container(
-                          width: 48, height: 2.5,
+                          width: 90,
+                          height: 2,
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
-                              colors: [Colors.transparent, kGold, Colors.transparent],
+                              colors: [
+                                Colors.transparent,
+                                kGoldDeep,
+                                kGoldLight,
+                                kGoldDeep,
+                                Colors.transparent,
+                              ],
+                              stops: [0.0, 0.2, 0.5, 0.8, 1.0],
                             ),
                             borderRadius: BorderRadius.circular(2),
                           ),
@@ -297,19 +373,19 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                 ),
 
-                const SizedBox(height: 14),
+                const SizedBox(height: 16),
 
-                // ── Tagline ──
+                // ── Tagline ───────────────────────────────────────────────
                 FadeTransition(
                   opacity: _fadeTagline,
                   child: const Text(
                     'تحويل فوري  ·  آمن  ·  موثوق',
                     style: TextStyle(
                       fontFamily: 'Cairo',
-                      fontSize: 14,
+                      fontSize: 13,
                       fontWeight: FontWeight.w500,
                       color: kTextSub,
-                      letterSpacing: 0.8,
+                      letterSpacing: 1.0,
                     ),
                   ),
                 ),
@@ -317,35 +393,34 @@ class _SplashScreenState extends State<SplashScreen>
             ),
           ),
 
-          // ── شريط التقدم في الأسفل ──────────────────────────────────────
+          // ── شريط التقدم الذهبي ────────────────────────────────────────────
           Positioned(
-            bottom: 60,
+            bottom: 56,
             left: 48,
             right: 48,
             child: Column(
               children: [
-                // حاوية شريط التقدم
                 ClipRRect(
                   borderRadius: BorderRadius.circular(4),
                   child: Container(
-                    height: 3,
-                    color: const Color(0xFF1E1408),
+                    height: 2.5,
+                    color: const Color(0xFF1C1508),
                     child: AnimatedBuilder(
                       animation: _progress,
                       builder: (_, __) => FractionallySizedBox(
-                        alignment: Alignment.centerRight,
+                        alignment: Alignment.centerLeft,
                         widthFactor: _progress.value,
                         child: Container(
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
-                              colors: [kPrimary, kGold],
-                              begin: Alignment.centerRight,
-                              end: Alignment.centerLeft,
+                              colors: [kGoldDeep, kGold, kGoldLight],
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: kGold.withOpacity(0.5),
-                                blurRadius: 6,
+                                color: kGold.withOpacity(0.65),
+                                blurRadius: 8,
                               ),
                             ],
                           ),
@@ -357,13 +432,22 @@ class _SplashScreenState extends State<SplashScreen>
 
                 const SizedBox(height: 16),
 
-                // نقطة + نص أسفل الشريط
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
-                      width: 6, height: 6,
-                      decoration: const BoxDecoration(color: kPrimary, shape: BoxShape.circle),
+                      width: 5,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: kGold.withOpacity(0.8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: kGold.withOpacity(0.5),
+                            blurRadius: 5,
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(width: 8),
                     const Text(
@@ -385,30 +469,32 @@ class _SplashScreenState extends State<SplashScreen>
     );
   }
 
-  /// جسيمات تدور حول الأيقونة
+  /// جسيمات مدارية ذهبية — 6 جسيمات
   List<Widget> _buildOrbitParticles(double angle) {
-    const double radius = 75;
+    const double radius = 82;
     final particles = <Widget>[];
 
-    for (int i = 0; i < 4; i++) {
-      final particleAngle = angle + (i * math.pi / 2);
+    for (int i = 0; i < 6; i++) {
+      final particleAngle = angle + (i * math.pi / 3);
       final dx = radius * math.cos(particleAngle);
       final dy = radius * math.sin(particleAngle);
-      final isGold = i % 2 == 0;
+      final isLarge = i % 2 == 0;
 
       particles.add(
         Transform.translate(
           offset: Offset(dx, dy),
           child: Container(
-            width: isGold ? 6 : 4,
-            height: isGold ? 6 : 4,
+            width: isLarge ? 7 : 4,
+            height: isLarge ? 7 : 4,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: isGold ? kGold.withOpacity(0.8) : kPrimary.withOpacity(0.6),
+              color: isLarge
+                  ? kGold.withOpacity(0.9)
+                  : kGoldLight.withOpacity(0.55),
               boxShadow: [
                 BoxShadow(
-                  color: (isGold ? kGold : kPrimary).withOpacity(0.6),
-                  blurRadius: 6,
+                  color: kGold.withOpacity(isLarge ? 0.7 : 0.35),
+                  blurRadius: isLarge ? 8 : 4,
                 ),
               ],
             ),
@@ -422,14 +508,14 @@ class _SplashScreenState extends State<SplashScreen>
 }
 
 // ─────────────────────────────────────────────
-//  خلفية شبكة هندسية مخصصة للسبلاش
+//  خلفية شبكة هندسية ذهبية
 // ─────────────────────────────────────────────
 class _SplashGridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final p = Paint()
-      ..color = const Color(0xFFA64D04).withOpacity(0.035)
-      ..strokeWidth = 0.7;
+      ..color = const Color(0xFFECB651).withOpacity(0.028)
+      ..strokeWidth = 0.6;
 
     const step = 40.0;
     for (double x = 0; x < size.width; x += step) {
@@ -439,31 +525,33 @@ class _SplashGridPainter extends CustomPainter {
       canvas.drawLine(Offset(0, y), Offset(size.width, y), p);
     }
 
-    // توهج مركزي
+    // توهج ذهبي مركزي
     final glow = Paint()
       ..shader = RadialGradient(
         colors: [
-          const Color(0xFFA64D04).withOpacity(0.10),
+          const Color(0xFFECB651).withOpacity(0.09),
           Colors.transparent,
         ],
       ).createShader(Rect.fromCircle(
         center: Offset(size.width / 2, size.height / 2),
-        radius: size.width * 0.5,
+        radius: size.width * 0.55,
       ));
-    canvas.drawCircle(Offset(size.width / 2, size.height / 2), size.width * 0.5, glow);
+    canvas.drawCircle(
+        Offset(size.width / 2, size.height / 2), size.width * 0.55, glow);
 
-    // توهج سفلي
+    // توهج ذهبي سفلي
     final glowBottom = Paint()
       ..shader = RadialGradient(
         colors: [
-          const Color(0xFFECB651).withOpacity(0.05),
+          const Color(0xFFD4982A).withOpacity(0.06),
           Colors.transparent,
         ],
       ).createShader(Rect.fromCircle(
         center: Offset(size.width / 2, size.height),
-        radius: size.width * 0.55,
+        radius: size.width * 0.6,
       ));
-    canvas.drawCircle(Offset(size.width / 2, size.height), size.width * 0.55, glowBottom);
+    canvas.drawCircle(
+        Offset(size.width / 2, size.height), size.width * 0.6, glowBottom);
   }
 
   @override

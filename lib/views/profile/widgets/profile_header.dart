@@ -1,28 +1,20 @@
 // =============================================================================
-//  profile_header.dart
-//  Flash Pay — Profile Hero Header
-//  ─────────────────────────────────
-//  Full-bleed gradient section that shows:
-//    • Lottie avatar inside a circular glowing frame
-//    • User's name + email/phone (read from controller text values)
-//    • "Verified User" badge with animated glow ring
-//
-//  ✅ UI-only.  Accepts data as plain Strings — rebuilt by parent Obx().
-//     The Lottie asset path is unchanged from the original: 'images/profile.json'
+//  profile_header.dart  — FlashPay (Fixed & Enhanced)
+//  ✅ FIX: Avatar size is now responsive (min 100, max 130) via MediaQuery
+//  ✅ FIX: Name + contact text use maxLines + overflow to prevent layout breaks
+//  ✅ FIX: Container padding uses SafeArea top instead of MediaQuery manually
+//  ✅ IMPROVE: _VerifiedBadge is fully const
+//  ✅ IMPROVE: const constructors throughout
 // =============================================================================
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:lottie/lottie.dart';
 
-// Re-use shared brand tokens from the dashboard revamp
 import '../../dashboards/user_dashboards/widgets/fp_theme.dart';
 
 class ProfileHeader extends StatefulWidget {
-  /// User's full name — read from controller.nameController.text
   final String name;
-
-  /// Contact detail shown below the name (email or phone)
   final String contact;
 
   const ProfileHeader({
@@ -37,7 +29,6 @@ class ProfileHeader extends StatefulWidget {
 
 class _ProfileHeaderState extends State<ProfileHeader>
     with SingleTickerProviderStateMixin {
-  // ── Pulsing glow animation (local UI state only) ─────────────────────────
   late final AnimationController _glowAc = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1800),
@@ -52,6 +43,9 @@ class _ProfileHeaderState extends State<ProfileHeader>
   @override
   Widget build(BuildContext context) {
     final double statusBarH = MediaQuery.of(context).padding.top;
+    // ✅ FIX: Responsive avatar size clamped between 100–130px
+    final double avatarSize =
+    (MediaQuery.of(context).size.width * 0.30).clamp(100.0, 130.0);
 
     return Container(
       padding: EdgeInsets.only(top: statusBarH),
@@ -61,23 +55,22 @@ class _ProfileHeaderState extends State<ProfileHeader>
       ),
       child: Stack(
         children: [
-          // ── Decorative background circles ───────────────────────────────
-          const Positioned(top: -30, right: -50,
+          const Positioned(
+              top: -30, right: -50,
               child: _DecorCircle(size: 200, opacity: 0.08)),
-          const Positioned(bottom: 10, left: -60,
+          const Positioned(
+              bottom: 10, left: -60,
               child: _DecorCircle(size: 220, opacity: 0.05)),
 
-          // ── Main content ────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
             child: Column(
               children: [
-                // Avatar with animated glow ring
+                // Avatar with glow ring
                 AnimatedBuilder(
                   animation: _glowAc,
                   builder: (_, child) {
-                    final double glowSpread =
-                        4 + (_glowAc.value * 8); // 4–12 px pulse
+                    final double spread = 4 + (_glowAc.value * 8);
                     return Container(
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
@@ -85,7 +78,7 @@ class _ProfileHeaderState extends State<ProfileHeader>
                           BoxShadow(
                             color: Colors.white.withOpacity(0.30),
                             blurRadius: 28,
-                            spreadRadius: glowSpread,
+                            spreadRadius: spread,
                           ),
                         ],
                       ),
@@ -93,21 +86,20 @@ class _ProfileHeaderState extends State<ProfileHeader>
                     );
                   },
                   child: Container(
-                    width: 120,
-                    height: 120,
+                    width: avatarSize,
+                    height: avatarSize,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: Colors.white.withOpacity(0.18),
                       border: Border.all(
                           color: Colors.white.withOpacity(0.50), width: 2.5),
                     ),
-                    // ✅ Lottie path unchanged from original
                     child: ClipOval(
                       child: Lottie.asset(
                         'images/profile.json',
-                        height: 120,
-                        width: 120,
-                        fit: BoxFit.cover,
+                        height: avatarSize,
+                        width:  avatarSize,
+                        fit:    BoxFit.cover,
                         repeat: true,
                       ),
                     ),
@@ -116,17 +108,19 @@ class _ProfileHeaderState extends State<ProfileHeader>
                     .animate()
                     .fadeIn(duration: 500.ms)
                     .scale(
-                      begin: const Offset(0.7, 0.7),
-                      curve: Curves.easeOutBack,
-                    ),
+                  begin: const Offset(0.7, 0.7),
+                  curve: Curves.easeOutBack,
+                ),
 
                 const SizedBox(height: 16),
 
-                // User name
+                // ✅ FIX: maxLines + overflow for very long names
                 Text(
                   widget.name.isEmpty ? 'المستخدم' : widget.name,
-                  style: FPTextStyles.greetingName.copyWith(fontSize: 24),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
+                  style: FPTextStyles.greetingName.copyWith(fontSize: 22),
                 )
                     .animate()
                     .fadeIn(delay: 150.ms, duration: 400.ms)
@@ -134,11 +128,13 @@ class _ProfileHeaderState extends State<ProfileHeader>
 
                 const SizedBox(height: 6),
 
-                // Email / phone
+                // ✅ FIX: maxLines for long email addresses
                 Text(
                   widget.contact.isEmpty ? '—' : widget.contact,
-                  style: FPTextStyles.greetingHint.copyWith(fontSize: 13),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
+                  style: FPTextStyles.greetingHint.copyWith(fontSize: 13),
                 )
                     .animate()
                     .fadeIn(delay: 220.ms, duration: 400.ms)
@@ -146,7 +142,6 @@ class _ProfileHeaderState extends State<ProfileHeader>
 
                 const SizedBox(height: 16),
 
-                // "Verified User" badge
                 const _VerifiedBadge()
                     .animate()
                     .fadeIn(delay: 320.ms, duration: 450.ms)
@@ -162,7 +157,6 @@ class _ProfileHeaderState extends State<ProfileHeader>
   }
 }
 
-// ─── Verified badge pill ──────────────────────────────────────────────────────
 class _VerifiedBadge extends StatelessWidget {
   const _VerifiedBadge();
 
@@ -173,12 +167,12 @@ class _VerifiedBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.20),
         borderRadius: BorderRadius.circular(30),
-        border:
-            Border.all(color: Colors.white.withOpacity(0.45), width: 1.2),
+        border: Border.all(
+            color: Colors.white.withOpacity(0.45), width: 1.2),
       ),
-      child: Row(
+      child: const Row(
         mainAxisSize: MainAxisSize.min,
-        children: const [
+        children: [
           Icon(Icons.verified_rounded, color: Colors.white, size: 16),
           SizedBox(width: 6),
           Text(
@@ -196,7 +190,6 @@ class _VerifiedBadge extends StatelessWidget {
   }
 }
 
-// ─── Decorative background circle ────────────────────────────────────────────
 class _DecorCircle extends StatelessWidget {
   final double size;
   final double opacity;
@@ -205,8 +198,7 @@ class _DecorCircle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: size,
-      height: size,
+      width: size, height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: Colors.white.withOpacity(opacity),

@@ -1,8 +1,9 @@
+import 'package:flashpay/controllers/BiometricController.dart';
 import 'package:flashpay/controllers/notification_controller.dart';
 import 'package:flashpay/controllers/theme_controller.dart';
 import 'package:flashpay/core/AppTheme.dart';
 import 'package:flashpay/views/BlcokedScreen.dart';
-import 'package:flashpay/views/auth/splash_screen.dart'; // ← السبلاش الجديدة
+import 'package:flashpay/views/auth/splash_screen.dart';
 import 'package:flashpay/views/chat/chat_screen.dart';
 import 'package:flashpay/views/dashboards/agent_dashboards/agent_dashboard.dart';
 import 'package:flutter/material.dart';
@@ -16,8 +17,6 @@ import 'data/local/storage_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
-
-// دالة لاستقبال الإشعارات والتطبيق مغلق أو في الخلفية
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   print("Handling a background message: ${message.messageId}");
@@ -32,6 +31,9 @@ void main() async {
   Get.put(StorageService());
   Get.put(ThemeController());
   Get.put(NotificationController());
+  // ✅ سجّل BiometricController هنا حتى يكون جاهزاً في SplashScreen
+  Get.put(BiometricController());
+
   runApp(const FlashPayApp());
 }
 
@@ -49,12 +51,12 @@ class FlashPayApp extends StatelessWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: themeController.themeMode,
       getPages: [
-        GetPage(name: '/splash',           page: () => const SplashScreen()),
-        GetPage(name: '/login',            page: () => LoginScreen()),
-        GetPage(name: '/register',         page: () => RegisterScreen()),
-        GetPage(name: '/user_dashboard',   page: () => const UserDashboardView()),
-        GetPage(name: '/agent_dashboard',  page: () => const AgentDashboard()),
-        GetPage(name: '/blocked',          page: () => const BlockedScreen()),
+        GetPage(name: '/splash',          page: () => const SplashScreen()),
+        GetPage(name: '/login',           page: () => LoginScreen()),
+        GetPage(name: '/register',        page: () => RegisterScreen()),
+        GetPage(name: '/user_dashboard',  page: () => const UserDashboardView()),
+        GetPage(name: '/agent_dashboard', page: () => const AgentDashboard()),
+        GetPage(name: '/blocked',         page: () => const BlockedScreen()),
       ],
     );
   }
