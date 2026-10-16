@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flashpay/controllers/notification_controller.dart';
 import 'package:get/get.dart'; // 👈 ضروري
 import 'package:google_nav_bar/google_nav_bar.dart';
 import 'fp_theme.dart';
@@ -37,17 +38,89 @@ class FPBottomNavBar extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             duration: const Duration(milliseconds: 350),
             mainAxisAlignment: MainAxisAlignment.spaceAround,
-            tabs: const [
-              GButton(icon: Icons.home_rounded, text: 'الرئيسية', textStyle: FPTextStyles.navActive),
-              GButton(icon: Icons.notifications_rounded, text: 'الإشعارات', textStyle: FPTextStyles.navActive),
-              GButton(icon: Icons.settings_rounded, text: 'الإعدادات', textStyle: FPTextStyles.navActive),
-              GButton(icon: Icons.person_rounded, text: 'الحساب', textStyle: FPTextStyles.navActive),
+            tabs: [
+              const GButton(icon: Icons.home_rounded, text: 'الرئيسية', textStyle: FPTextStyles.navActive),
+              // ✅ أيقونة الإشعارات مع شارة عدد غير المقروء
+              GButton(
+                icon: Icons.notifications_rounded,
+                text: 'الإشعارات',
+                textStyle: FPTextStyles.navActive,
+                leading: _NotifNavIcon(
+                  active: selectedIndex == 1,
+                  inactiveColor: isDark ? Colors.white54 : FPColors.textMid,
+                  badgeBorder: context.theme.cardColor,
+                ),
+              ),
+              const GButton(icon: Icons.settings_rounded, text: 'الإعدادات', textStyle: FPTextStyles.navActive),
+              const GButton(icon: Icons.person_rounded, text: 'الحساب', textStyle: FPTextStyles.navActive),
             ],
             selectedIndex: selectedIndex,
             onTabChange: onTabChange,
           ),
         ),
       ),
+    );
+  }
+}
+
+// ── أيقونة الإشعارات + شارة غير المقروء ──────────────────────────────────────
+class _NotifNavIcon extends StatelessWidget {
+  final bool active;
+  final Color inactiveColor;
+  final Color badgeBorder;
+
+  const _NotifNavIcon({
+    required this.active,
+    required this.inactiveColor,
+    required this.badgeBorder,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final nc = Get.isRegistered<NotificationController>()
+        ? Get.find<NotificationController>()
+        : null;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Icon(
+          Icons.notifications_rounded,
+          size: 24,
+          color: active ? FPColors.primary : inactiveColor,
+        ),
+        if (nc != null)
+          Positioned(
+            top: -6,
+            right: -8,
+            child: Obx(() {
+              final n = nc.unread.value;
+              if (n == 0) return const SizedBox.shrink();
+              return Semantics(
+                label: '$n إشعارات غير مقروءة',
+                child: Container(
+                  constraints: const BoxConstraints(minWidth: 17, minHeight: 17),
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDC2626),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: badgeBorder, width: 1.5),
+                  ),
+                  child: Text(
+                    n > 9 ? '9+' : '$n',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      height: 1.1,
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+      ],
     );
   }
 }

@@ -1,3 +1,4 @@
+import 'package:flashpay/controllers/notification_controller.dart';
 import 'package:flashpay/repos/auth_repo.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -7,6 +8,9 @@ import 'dart:io';
 import '../data/local/storage_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flashpay/data/network/api_client.dart';
+import 'package:flashpay/core/api_error.dart';
+import 'package:flashpay/core/fp_feedback.dart';
+import 'package:flashpay/core/validators.dart';
 
 class AuthController extends GetxController {
   final AuthRepository _authRepository = AuthRepository();
@@ -141,9 +145,12 @@ class AuthController extends GetxController {
 
   // دالة تسجيل الدخول
   Future<void> login() async {
-    if (loginEmailController.text.isEmpty || loginPasswordController.text.isEmpty) {
-      Get.snackbar('تنبيه', 'يرجى إدخال البريد الإلكتروني وكلمة المرور',
-          backgroundColor: Colors.orange, colorText: Colors.white);
+    if (isLoading.value) return;
+
+    final loginInputError = FPValidators.email(loginEmailController.text) ??
+        FPValidators.loginPassword(loginPasswordController.text);
+    if (loginInputError != null) {
+      FPFeedback.error(loginInputError, title: 'تحقق من البيانات');
       return;
     }
 
@@ -194,48 +201,53 @@ class AuthController extends GetxController {
         Get.offAllNamed('/blocked');
         return;
       }
-      String errorMessage = 'حدث خطأ غير متوقع';
-      if (e.response?.statusCode == 401) {
-        errorMessage = 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
-      }
-      Get.snackbar('خطأ', errorMessage,
-          backgroundColor: Colors.red, colorText: Colors.white);
+      FPFeedback.error(
+        ApiError.message(e, statusMessages: const {
+          401: 'البريد الإلكتروني أو كلمة المرور غير صحيحة',
+        }),
+        title: 'تعذّر تسجيل الدخول',
+      );
+    } catch (e) {
+      debugPrint('Login unexpected error: $e');
+      FPFeedback.error('حدث خطأ غير متوقع أثناء تسجيل الدخول، حاول مرة أخرى');
     } finally {
       isLoading.value = false;
     }
   }
 
+  /// أول خطأ في بيانات التسجيل، أو null إذا كانت كلها صحيحة
+  /// (احتياط خلف التحقق الموجود في الشاشة).
+  String? _registerInputError() {
+    final missingImages = <String>[
+      for (int i = 0; i < idCardImages.length; i++)
+        if (idCardImages[i] == null) imageLabel(i),
+    ];
+    return FPValidators.fullName(fullNameController.text) ??
+        FPValidators.email(registerEmailController.text) ??
+        ((registerPhoneFullNumber.value ?? '').trim().isEmpty
+            ? 'أدخل رقم الهاتف'
+            : null) ??
+        (selectedCountryId.value == null ? 'اختر البلد' : null) ??
+        (selectedCityId.value == null
+            ? 'اختر المدينة'
+            : null) ??
+        FPValidators.newPassword(registerPasswordController.text) ??
+        (registerPasswordController.text !=
+            confirmRegisterPasswordController.text
+            ? 'كلمتا المرور غير متطابقتين'
+            : null) ??
+        (missingImages.isNotEmpty
+            ? 'ارفع الصور الناقصة: ${missingImages.join('، ')}'
+            : null);
+  }
+
   // دالة إنشاء الحساب
   Future<void> register() async {
-    if (registerPasswordController.text != confirmRegisterPasswordController.text) {
-      Get.snackbar('خطأ', 'كلمتا المرور غير متطابقتين!',
-          backgroundColor: Colors.red, colorText: Colors.white);
-      return;
-    }
+    if (isLoading.value) return;
 
-    if (selectedCountryId.value == null || selectedCityId.value == null) {
-      Get.snackbar('تنبيه', 'يرجى اختيار البلد والمدينة',
-          backgroundColor: Colors.orange, colorText: Colors.white);
-      return;
-    }
-
-    // التحقق من رقم الهاتف
-    if (registerPhoneFullNumber.value == null ||
-        registerPhoneFullNumber.value!.isEmpty) {
-      Get.snackbar('تنبيه', 'يرجى إدخال رقم الهاتف',
-          backgroundColor: Colors.orange, colorText: Colors.white);
-      return;
-    }
-
-    // التحقق من جميع صور الهوية
-    if (!allImagesUploaded) {
-      Get.snackbar(
-        'تنبيه',
-        'يرجى رفع جميع صور الهوية الثلاث (صورة شخصية مع الهوية، وجه الهوية، ظهر الهوية)',
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-        duration: const Duration(seconds: 4),
-      );
+    final registerError = _registerInputError();
+    if (registerError != null) {
+      FPFeedback.error(registerError, title: 'تحقق من البيانات');
       return;
     }
 
@@ -271,23 +283,18 @@ class AuthController extends GetxController {
       final response = await _authRepository.registerUser(formData);
 
       if (response.statusCode == 201) {
-        Get.snackbar('نجاح', 'تم إنشاء الحساب بنجاح، يمكنك الآن تسجيل الدخول',
-            backgroundColor: Colors.green, colorText: Colors.white);
+        FPFeedback.success('تم إنشاء الحساب بنجاح، يمكنك الآن تسجيل الدخول');
         Get.offNamed('/login');
       }
     } on dio.DioException catch (e) {
-      String errorMessage = 'فشل إنشاء الحساب';
       debugPrint('Laravel Error: $e');
-      if (e.response?.statusCode == 422) {
-        final errors = e.response?.data['errors'];
-        if (errors != null && errors is Map) {
-          errorMessage = (errors.values.first as List).first.toString();
-        } else {
-          errorMessage = e.response?.data['message'] ?? 'البيانات المدخلة غير صحيحة';
-        }
-      }
-      Get.snackbar('خطأ', errorMessage,
-          backgroundColor: Colors.red, colorText: Colors.white);
+      FPFeedback.error(
+        ApiError.message(e, fallback: 'فشل إنشاء الحساب'),
+        title: 'تعذّر إنشاء الحساب',
+      );
+    } catch (e) {
+      debugPrint('Register unexpected error: $e');
+      FPFeedback.error('حدث خطأ غير متوقع أثناء إنشاء الحساب، حاول مرة أخرى');
     } finally {
       isLoading.value = false;
     }
@@ -304,8 +311,113 @@ class AuthController extends GetxController {
     } catch (e) {
       debugPrint('Logout API Error: $e');
     } finally {
+      // ✅ امسح الإشعارات المحفوظة محلياً حتى لا يراها المستخدم التالي على الجهاز
+      try {
+        if (Get.isRegistered<NotificationController>()) {
+          await Get.find<NotificationController>().clearAll();
+        }
+      } catch (e) {
+        debugPrint('Clear notifications error: $e');
+      }
+
+      // ✅ ألغِ توكن FCM الحالي: يمنع وصول إشعارات هذا الحساب إلى الجهاز بعد الخروج
+      //    (يُولَّد توكن جديد تلقائياً ويُرفع عند تسجيل الدخول التالي)
+      try {
+        await FirebaseMessaging.instance.deleteToken();
+      } catch (e) {
+        debugPrint('Delete FCM token error: $e');
+      }
+
       await _storageService.clearAuthData();
       Get.offAllNamed('/login');
+    }
+  }
+
+  // ===========================================================================
+  //  ✅ استعادة كلمة المرور
+  // ===========================================================================
+
+  final resetEmailController = TextEditingController();
+  final resetCodeController  = TextEditingController();
+  final resetPassController  = TextEditingController();
+  final resetConfirmPassController = TextEditingController();
+
+  // 0: إدخال البريد | 1: إدخال الرمز + كلمة المرور الجديدة
+  var resetStep = 0.obs;
+
+  Future<void> sendResetCode() async {
+    if (isLoading.value) return;
+
+    final email = resetEmailController.text.trim();
+    final emailError = FPValidators.email(email);
+    if (emailError != null) {
+      FPFeedback.error(emailError, title: 'تحقق من البيانات');
+      return;
+    }
+
+    isLoading.value = true;
+    try {
+      await _authRepository.forgotPassword(email);
+      resetStep.value = 1;
+      FPFeedback.success(
+          'إذا كان البريد مسجلًا فستصلك رسالة تحتوي على رمز التحقق',
+          title: 'تم الإرسال');
+    } on dio.DioException catch (e) {
+      FPFeedback.error(
+        ApiError.message(e, fallback: 'تعذر الإرسال، حاول لاحقًا'),
+        title: 'تعذّر إرسال الرمز',
+      );
+    } catch (e) {
+      debugPrint('sendResetCode unexpected error: $e');
+      FPFeedback.error('حدث خطأ غير متوقع، حاول مرة أخرى');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> submitNewPassword() async {
+    if (isLoading.value) return;
+
+    final code = resetCodeController.text.trim();
+    final pass = resetPassController.text;
+    final confirm = resetConfirmPassController.text;
+
+    final inputError = FPValidators.otpCode(code) ??
+        FPValidators.newPassword(pass) ??
+        (pass != confirm ? 'كلمتا المرور غير متطابقتين' : null);
+    if (inputError != null) {
+      FPFeedback.error(inputError, title: 'تحقق من البيانات');
+      return;
+    }
+
+    isLoading.value = true;
+    try {
+      await _authRepository.resetPassword(
+        email: resetEmailController.text.trim(),
+        code: code,
+        password: pass,
+      );
+      FPFeedback.success('تم تغيير كلمة المرور، يمكنك تسجيل الدخول الآن');
+
+      // تفريغ الحقول والعودة لتسجيل الدخول
+      resetStep.value = 0;
+      resetEmailController.clear();
+      resetCodeController.clear();
+      resetPassController.clear();
+      resetConfirmPassController.clear();
+      Get.offAllNamed('/login');
+    } on dio.DioException catch (e) {
+      FPFeedback.error(
+        ApiError.message(e, statusMessages: const {
+          422: 'رمز التحقق غير صحيح أو منتهي الصلاحية، اطلب رمزًا جديدًا',
+        }),
+        title: 'تعذّر تغيير كلمة المرور',
+      );
+    } catch (e) {
+      debugPrint('submitNewPassword unexpected error: $e');
+      FPFeedback.error('حدث خطأ غير متوقع، حاول مرة أخرى');
+    } finally {
+      isLoading.value = false;
     }
   }
 
@@ -318,6 +430,10 @@ class AuthController extends GetxController {
     registerPhoneController.dispose();
     registerPasswordController.dispose();
     confirmRegisterPasswordController.dispose();
+    resetEmailController.dispose();
+    resetCodeController.dispose();
+    resetPassController.dispose();
+    resetConfirmPassController.dispose();
     super.onClose();
   }
 }

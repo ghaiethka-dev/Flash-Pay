@@ -2,6 +2,7 @@ plugins {
     id "com.android.application"
     id "kotlin-android"
     id "dev.flutter.flutter-gradle-plugin"
+    id "com.google.gms.google-services"
 }
 
 def localProperties = new Properties()
@@ -10,6 +11,13 @@ if (localPropertiesFile.exists()) {
     localPropertiesFile.withReader('UTF-8') { reader ->
         localProperties.load(reader)
     }
+}
+
+// معلومات مفتاح التوقيع (release keystore) - لا يتم رفعها إلى git
+def keystorePropertiesFile = rootProject.file('key.properties')
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
 def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
@@ -23,38 +31,56 @@ if (flutterVersionName == null) {
 }
 
 android {
-    namespace "com.example.flashpay"
-    compileSdk flutter.compileSdkVersion
-    ndkVersion "26.1.10909125"
+    // ⚠️ يفضّل تغييره قبل أول رفع للمتجر (راجع الشرح في الرسالة عن سبب عدم استخدام com.example)
+    namespace "com.flashpay.sy"
+    // تم تثبيت compileSdk/targetSdk = 36 صراحة بدل الاعتماد على قيمة Flutter الافتراضية
+    // لضمان التوافق مع متطلبات Google Play (يجب الاستهداف Android 16 / API 36 بحلول 31 أغسطس 2026)
+    compileSdk 36
+    // NDK بإصدار يدعم محاذاة 16KB memory page size (مطلوب لأي مكتبات native .so)
+    ndkVersion "28.2.13676358"
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
     kotlinOptions {
-        // قم بتغيير القيمة إلى '17'
         jvmTarget = '17'
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId "com.example.flashpay"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://docs.flutter.dev/deployment/android#reviewing-the-gradle-build-configuration.
-        minSdkVersion 21
-        targetSdkVersion flutter.targetSdkVersion
+        applicationId "com.flashpay.sy"
+        minSdkVersion 24
+        targetSdkVersion 36
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
     }
 
+    signingConfigs {
+        release {
+            if (keystoreProperties['storeFile']) {
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig signingConfigs.debug
+            // يستخدم مفتاح التوقيع الحقيقي (release keystore) بدل مفتاح debug
+            // بشرط وجود ملف android/key.properties (راجع خطوات إنشائه في الرسالة)
+            signingConfig signingConfigs.release
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    packagingOptions {
+        // يضمن عدم ضغط المكتبات native حتى تبقى محاذاة 16KB سليمة
+        jniLibs {
+            useLegacyPackaging = false
         }
     }
 }

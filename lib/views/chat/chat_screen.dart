@@ -5,6 +5,8 @@
 //  ✅ تحسين حالة "لا توجد رسائل" 
 //  ✅ تحسين حالة التحميل
 //  ✅ تحسين الفواصل الزمنية بين الرسائل
+//  ✅ تحديث تلقائي (من ChatController) + شارة "رسائل جديدة" بدل القفز المزعج
+//  ✅ إصلاح: لا يُعاد استخدام controller لحوالة أخرى
 // =============================================================================
 
 import 'package:flutter/material.dart';
@@ -60,13 +62,17 @@ class ChatScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ✅ استخدام fenOrPut لمنع إنشاء controller جديد إذا كان موجوداً
+    // ✅ لا نعيد استخدام controller يخص حوالة أخرى (كان يعرض محادثة خاطئة)
+    if (Get.isRegistered<ChatController>() &&
+        Get.find<ChatController>().transferId != transferId) {
+      Get.delete<ChatController>(force: true);
+    }
     final controller = Get.isRegistered<ChatController>()
         ? Get.find<ChatController>()
         : Get.put(ChatController(
-            transferId:    transferId,
-            currentUserId: currentUserId,
-          ));
+      transferId:    transferId,
+      currentUserId: currentUserId,
+    ));
 
     final bool  isDark     = context.theme.brightness == Brightness.dark;
     final Color brandColor = AppColors.primaryGradient.colors.first;
@@ -111,54 +117,77 @@ class ChatScreen extends StatelessWidget {
                       }
 
                       // ── قائمة الرسائل ─────────────────────────────────────
-                      return ListView.builder(
-                        controller: controller.scrollController,
-                        physics:    const BouncingScrollPhysics(),
-                        padding:    const EdgeInsets.fromLTRB(14, 16, 14, 8),
-                        itemCount:  controller.messages.length,
-                        itemBuilder: (context, index) {
-                          final msg = controller.messages[index];
+                      return Stack(
+                        children: [
+                          Positioned.fill(child: ListView.builder(
+                            controller: controller.scrollController,
+                            physics:    const BouncingScrollPhysics(),
+                            padding:    const EdgeInsets.fromLTRB(14, 16, 14, 8),
+                            itemCount:  controller.messages.length,
+                            itemBuilder: (context, index) {
+                              final msg = controller.messages[index];
 
-                          final bool isMe    = msg.senderId == currentUserId;
-                          final bool isAdmin = msg.isStaff;
+                              final bool isMe    = msg.senderId == currentUserId;
+                              final bool isAdmin = msg.isStaff;
 
-                          final bool groupWithPrev = index > 0 &&
-                              controller.messages[index - 1].senderId ==
-                                  msg.senderId;
-                          final bool groupWithNext =
-                              index < controller.messages.length - 1 &&
-                                  controller.messages[index + 1].senderId ==
+                              final bool groupWithPrev = index > 0 &&
+                                  controller.messages[index - 1].senderId ==
                                       msg.senderId;
+                              final bool groupWithNext =
+                                  index < controller.messages.length - 1 &&
+                                      controller.messages[index + 1].senderId ==
+                                          msg.senderId;
 
-                          // ✅ فاصل اليوم: يظهر إذا تغير التاريخ
-                          final bool showDateSeparator = index == 0 ||
-                              _formatDateLabel(msg.createdAt) !=
-                                  _formatDateLabel(
-                                      controller.messages[index - 1].createdAt);
+                              // ✅ فاصل اليوم: يظهر إذا تغير التاريخ
+                              final bool showDateSeparator = index == 0 ||
+                                  _formatDateLabel(msg.createdAt) !=
+                                      _formatDateLabel(
+                                          controller.messages[index - 1].createdAt);
 
-                          return Column(
-                            children: [
-                              if (showDateSeparator)
-                                _DateSeparator(
-                                  label: _formatDateLabel(msg.createdAt),
-                                  isDark: isDark,
-                                ),
-                              ChatBubble(
-                                message:           msg.text,
-                                imageUrl:          msg.imageUrl,
-                                senderName:        msg.senderName,
-                                isMe:              isMe,
-                                isDark:            isDark,
-                                brandColor:        brandColor,
-                                isAdmin:           isAdmin,
-                                timestamp:         _formatTime(msg.createdAt),
-                                groupWithPrevious: groupWithPrev,
-                                groupWithNext:     groupWithNext,
-                                animationIndex:    index,
-                              ),
-                            ],
-                          );
-                        },
+                              return Column(
+                                children: [
+                                  if (showDateSeparator)
+                                    _DateSeparator(
+                                      label: _formatDateLabel(msg.createdAt),
+                                      isDark: isDark,
+                                    ),
+                                  ChatBubble(
+                                    key:               ValueKey('msg_${msg.id}'),
+                                    isRead:            msg.isRead,
+                                    animate:           index >= controller.messages.length - 2,
+                                    message:           msg.text,
+                                    imageUrl:          msg.imageUrl,
+                                    senderName:        msg.senderName,
+                                    isMe:              isMe,
+                                    isDark:            isDark,
+                                    brandColor:        brandColor,
+                                    isAdmin:           isAdmin,
+                                    timestamp:         _formatTime(msg.createdAt),
+                                    groupWithPrevious: groupWithPrev,
+                                    groupWithNext:     groupWithNext,
+                                    animationIndex:    index,
+                                  ),
+                                ],
+                              );
+                            },
+                          )),
+
+                          // ✅ شارة النزول لآخر رسالة / رسائل جديدة
+                          Positioned(
+                            bottom: 12,
+                            left: 0,
+                            right: 0,
+                            child: Center(
+                              child: Obx(() => _JumpToBottomPill(
+                                visible:
+                                controller.showJumpToBottom.value,
+                                unread: controller.unreadNew.value,
+                                isDark: isDark,
+                                onTap: controller.scrollToBottom,
+                              )),
+                            ),
+                          ),
+                        ],
                       );
                     }),
                   ),
@@ -463,5 +492,84 @@ class _DateSeparator extends StatelessWidget {
         ],
       ),
     ).animate().fadeIn(duration: 300.ms);
+  }
+}
+
+// ============================================================
+//  شارة "النزول لآخر رسالة" مع عدّاد الرسائل الجديدة
+// ============================================================
+class _JumpToBottomPill extends StatelessWidget {
+  final bool         visible;
+  final int          unread;
+  final bool         isDark;
+  final VoidCallback onTap;
+
+  const _JumpToBottomPill({
+    required this.visible,
+    required this.unread,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bool hasUnread = unread > 0;
+    final Color bg = hasUnread
+        ? const Color(0xFFC75D05)
+        : (isDark ? const Color(0xFF243650) : Colors.white);
+    final Color fg = hasUnread
+        ? Colors.white
+        : (isDark ? Colors.white : const Color(0xFF132341));
+
+    return AnimatedSlide(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      offset: visible ? Offset.zero : const Offset(0, 1.6),
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 180),
+        opacity: visible ? 1 : 0,
+        child: IgnorePointer(
+          ignoring: !visible,
+          child: Semantics(
+            button: true,
+            label: hasUnread
+                ? '$unread رسائل جديدة، اضغط للنزول'
+                : 'النزول لآخر رسالة',
+            child: Material(
+              color: bg,
+              elevation: 4,
+              shadowColor: Colors.black.withOpacity(0.25),
+              shape: const StadiumBorder(),
+              child: InkWell(
+                customBorder: const StadiumBorder(),
+                onTap: onTap,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                      horizontal: hasUnread ? 16 : 12, vertical: 10),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.keyboard_arrow_down_rounded,
+                          size: 20, color: fg),
+                      if (hasUnread) ...[
+                        const SizedBox(width: 4),
+                        Text(
+                          unread == 1 ? 'رسالة جديدة' : '$unread رسائل جديدة',
+                          style: TextStyle(
+                            color: fg,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

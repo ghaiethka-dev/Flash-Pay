@@ -5,6 +5,8 @@
 // =============================================================================
 
 import 'package:flashpay/controllers/theme_controller.dart';
+import 'package:flashpay/views/settings/widgets/how_it_works_screen.dart';
+import 'package:flashpay/views/settings/widgets/team_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -13,11 +15,14 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:flashpay/controllers/auth_controller.dart';
 
+import '../../controllers/BiometricController.dart';
+import '../../controllers/LanguageController.dart';
 import '../dashboards/user_dashboards/widgets/fp_theme.dart';
 import 'widgets/animated_toggle_tile.dart';
 import 'widgets/custom_settings_tile.dart';
 import 'widgets/logout_button.dart';
 import 'widgets/settings_section_card.dart';
+
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -25,7 +30,6 @@ class SettingsScreen extends StatelessWidget {
   Future<void> _openTelegram() async {
     final appUri = Uri.parse('tg://resolve?domain=Majdi_exchange');
     final webUri = Uri.parse('https://t.me/Majdi_exchange');
-
     if (await canLaunchUrl(appUri)) {
       await launchUrl(appUri);
     } else {
@@ -33,10 +37,116 @@ class SettingsScreen extends StatelessWidget {
     }
   }
 
+  /// Bottom Sheet اختيار اللغة
+  void _showLanguagePicker(
+      BuildContext context, LanguageController langCtrl) {
+    final bool isDark = context.theme.brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => Container(
+        margin: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: context.theme.cardColor,
+          borderRadius: const BorderRadius.all(Radius.circular(28)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 36),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // مقبض السحب
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: context.theme.dividerColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'اختر اللغة',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? Colors.white : FPColors.textDark,
+                ),
+              ),
+              const SizedBox(height: 20),
+              // قائمة اللغات
+              Obx(() => Column(
+                children:
+                LanguageController.supportedLanguages.map((lang) {
+                  final bool isSelected =
+                      langCtrl.currentLanguage.value.code == lang.code;
+                  return GestureDetector(
+                    onTap: () => langCtrl.changeLanguage(lang),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 18, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? FPColors.primary.withOpacity(0.10)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isSelected
+                              ? FPColors.primary.withOpacity(0.50)
+                              : (isDark
+                              ? Colors.white12
+                              : Colors.grey.shade200),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Text(lang.flag,
+                              style: const TextStyle(fontSize: 24)),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Text(
+                              lang.label,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: isSelected
+                                    ? FPColors.primary
+                                    : (isDark
+                                    ? Colors.white
+                                    : FPColors.textDark),
+                              ),
+                            ),
+                          ),
+                          if (isSelected)
+                            Icon(Icons.check_circle_rounded,
+                                color: FPColors.primary, size: 20),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              )),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final AuthController authController = Get.put(AuthController());
     final ThemeController themeController = Get.put(ThemeController());
+    final BiometricController biometricController =
+    Get.put(BiometricController());
+    final LanguageController languageController =
+    Get.put(LanguageController());
+
     final bool isDark = context.theme.brightness == Brightness.dark;
 
     return Directionality(
@@ -44,8 +154,10 @@ class SettingsScreen extends StatelessWidget {
       child: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
-          statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
-          statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+          statusBarIconBrightness:
+          isDark ? Brightness.light : Brightness.dark,
+          statusBarBrightness:
+          isDark ? Brightness.dark : Brightness.light,
         ),
         child: Scaffold(
           backgroundColor: context.theme.scaffoldBackgroundColor,
@@ -69,13 +181,19 @@ class SettingsScreen extends StatelessWidget {
                       titleIcon: Icons.security_rounded,
                       iconColor: FPColors.primary,
                       children: [
-                        AnimatedToggleTile(
+                        // ✅ البصمة مرتبطة بالكونترولر
+                        Obx(() => AnimatedToggleTile(
                           icon: Icons.fingerprint_rounded,
                           iconColor: FPColors.primary,
                           title: 'تسجيل الدخول بالبصمة',
                           subtitle: 'استخدم بصمة الإصبع أو Face ID',
-                          initialValue: false,
-                        ),
+                          initialValue:
+                          biometricController.isBiometricEnabled.value,
+                          onChanged: (bool value) {
+                            biometricController.toggleBiometric(value);
+                          },
+                          showDivider: false,
+                        )),
                       ],
                     )
                         .animate()
@@ -85,31 +203,6 @@ class SettingsScreen extends StatelessWidget {
                     const SizedBox(height: 16),
 
                     // ── 2. Notifications ──────────────────────────────────
-                    SettingsSectionCard(
-                      title: 'الإشعارات',
-                      titleIcon: Icons.notifications_none_rounded,
-                      iconColor: FPColors.amber,
-                      children: [
-                        AnimatedToggleTile(
-                          icon: Icons.notifications_active_rounded,
-                          iconColor: FPColors.amber,
-                          title: 'إشعارات التطبيق',
-                          subtitle: 'تلقي إشعارات الحوالات والتحديثات',
-                          initialValue: true,
-                        ),
-                        AnimatedToggleTile(
-                          icon: Icons.email_outlined,
-                          iconColor: FPColors.blue,
-                          title: 'إشعارات البريد الإلكتروني',
-                          subtitle: 'تقارير ومتابعة الحوالات عبر البريد',
-                          initialValue: false,
-                          showDivider: false,
-                        ),
-                      ],
-                    )
-                        .animate()
-                        .fadeIn(delay: 220.ms, duration: 500.ms)
-                        .slideY(begin: 0.10, curve: Curves.easeOut),
 
                     const SizedBox(height: 16),
 
@@ -129,21 +222,7 @@ class SettingsScreen extends StatelessWidget {
                             themeController.toggleTheme(value);
                           },
                         )),
-                        CustomSettingsTile(
-                          icon: Icons.language_rounded,
-                          iconColor: FPColors.green,
-                          title: 'اللغة',
-                          subtitle: 'العربية',
-                          onTap: () {},
-                        ),
-                        CustomSettingsTile(
-                          icon: Icons.currency_exchange_rounded,
-                          iconColor: FPColors.primary,
-                          title: 'العملة الافتراضية',
-                          subtitle: 'دولار أمريكي — USD',
-                          onTap: () {},
-                          showDivider: false,
-                        ),
+
                       ],
                     )
                         .animate()
@@ -158,9 +237,21 @@ class SettingsScreen extends StatelessWidget {
                       titleIcon: Icons.help_outline_rounded,
                       iconColor: FPColors.blue,
                       children: [
-                        // ── زر تيليغرام المخصص ──
                         _TelegramSupportTile(onTap: _openTelegram),
-
+                        CustomSettingsTile(
+                          icon: Icons.menu_book_rounded,
+                          iconColor: FPColors.primary,
+                          title: 'كيف يعمل التطبيق',
+                          subtitle: 'شرح خطوات الإرسال والاستلام',
+                          onTap: () => Get.to(() => const HowItWorksScreen()),
+                        ),
+                        CustomSettingsTile(
+                          icon: Icons.groups_rounded,
+                          iconColor: FPColors.purple,
+                          title: 'فريق العمل',
+                          subtitle: 'تعرّف على مهندسي Flash Pay',
+                          onTap: () => Get.to(() => const TeamScreen()),
+                        ),
                         CustomSettingsTile(
                           icon: Icons.info_outline_rounded,
                           iconColor: FPColors.textMid,
@@ -189,7 +280,8 @@ class SettingsScreen extends StatelessWidget {
                         'Flash Pay © 2026',
                         style: TextStyle(
                           fontSize: 12,
-                          color: isDark ? Colors.white54 : FPColors.textLight,
+                          color:
+                          isDark ? Colors.white54 : FPColors.textLight,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -206,7 +298,7 @@ class SettingsScreen extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Telegram Support Tile — تصميم مميز بلون تيليغرام
+//  Telegram Support Tile
 // ─────────────────────────────────────────────────────────────────────────────
 class _TelegramSupportTile extends StatelessWidget {
   final VoidCallback onTap;
@@ -223,9 +315,9 @@ class _TelegramSupportTile extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
-            // أيقونة تيليغرام
             Container(
-              width: 40, height: 40,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [Color(0xFF1E96D0), Color(0xFF2AABEE)],
@@ -241,7 +333,8 @@ class _TelegramSupportTile extends StatelessWidget {
                   ),
                 ],
               ),
-              child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+              child: const Icon(Icons.send_rounded,
+                  color: Colors.white, size: 20),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -262,7 +355,9 @@ class _TelegramSupportTile extends StatelessWidget {
                     style: TextStyle(
                       fontFamily: 'Cairo',
                       fontSize: 12,
-                      color: isDark ? Colors.white54 : Colors.grey.shade500,
+                      color: isDark
+                          ? Colors.white54
+                          : Colors.grey.shade500,
                     ),
                   ),
                 ],
@@ -281,7 +376,7 @@ class _TelegramSupportTile extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Settings page header
+//  Settings Page Header
 // ─────────────────────────────────────────────────────────────────────────────
 class _SettingsPageHeader extends StatelessWidget {
   const _SettingsPageHeader();
@@ -294,14 +389,17 @@ class _SettingsPageHeader extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(24, statusBarH + 20, 24, 28),
       decoration: const BoxDecoration(
         gradient: FPGradients.heroHeader,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
+        borderRadius:
+        BorderRadius.vertical(bottom: Radius.circular(32)),
       ),
       child: Stack(
         children: [
           Positioned(
-            top: -20, right: -40,
+            top: -20,
+            right: -40,
             child: Container(
-              width: 160, height: 160,
+              width: 160,
+              height: 160,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: Colors.white.withOpacity(0.07),
@@ -309,9 +407,11 @@ class _SettingsPageHeader extends StatelessWidget {
             ),
           ),
           Positioned(
-            bottom: -30, left: -30,
+            bottom: -30,
+            left: -30,
             child: Container(
-              width: 120, height: 120,
+              width: 120,
+              height: 120,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: Colors.white.withOpacity(0.05),
@@ -326,7 +426,8 @@ class _SettingsPageHeader extends StatelessWidget {
                   color: Colors.white.withOpacity(0.18),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Icon(Icons.settings_rounded, color: Colors.white, size: 22),
+                child: const Icon(Icons.settings_rounded,
+                    color: Colors.white, size: 22),
               ),
               const SizedBox(width: 14),
               const Column(
@@ -335,15 +436,19 @@ class _SettingsPageHeader extends StatelessWidget {
                   Text(
                     'الإعدادات',
                     style: TextStyle(
-                      color: Colors.white, fontSize: 22,
-                      fontWeight: FontWeight.w800, letterSpacing: 0.4,
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.4,
                     ),
                   ),
                   SizedBox(height: 2),
                   Text(
                     'تحكم كامل في حسابك وتفضيلاتك',
                     style: TextStyle(
-                      color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500,
+                      color: Colors.white70,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],

@@ -1,28 +1,82 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart'; // 👈
+import 'package:get/get.dart';
 import '../../dashboards/user_dashboards/widgets/fp_theme.dart';
 
 class AnimatedToggleTile extends StatefulWidget {
-  final IconData icon; final Color iconColor; final String title; final String? subtitle; final bool initialValue; final ValueChanged<bool>? onChanged; final bool showDivider;
-  const AnimatedToggleTile({Key? key, required this.icon, required this.iconColor, required this.title, this.subtitle, this.initialValue = false, this.onChanged, this.showDivider = true}) : super(key: key);
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String? subtitle;
+  final bool initialValue;
+  final ValueChanged<bool>? onChanged;
+  final bool showDivider;
+
+  const AnimatedToggleTile({
+    Key? key,
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    this.subtitle,
+    this.initialValue = false,
+    this.onChanged,
+    this.showDivider = true,
+  }) : super(key: key);
+
   @override
   State<AnimatedToggleTile> createState() => _AnimatedToggleTileState();
 }
 
-class _AnimatedToggleTileState extends State<AnimatedToggleTile> with SingleTickerProviderStateMixin {
+class _AnimatedToggleTileState extends State<AnimatedToggleTile>
+    with SingleTickerProviderStateMixin {
   late bool _isOn;
-  late final AnimationController _thumbAc = AnimationController(vsync: this, duration: const Duration(milliseconds: 260), value: widget.initialValue ? 1.0 : 0.0);
-  late final Animation<double> _thumbSlide = CurvedAnimation(parent: _thumbAc, curve: Curves.easeInOutCubic);
+  late final AnimationController _thumbAc;
+  late final Animation<double> _thumbSlide;
 
   @override
-  void initState() { super.initState(); _isOn = widget.initialValue; }
+  void initState() {
+    super.initState();
+    _isOn = widget.initialValue;
+    _thumbAc = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 260),
+      value: widget.initialValue ? 1.0 : 0.0,
+    );
+    _thumbSlide = CurvedAnimation(
+      parent: _thumbAc,
+      curve: Curves.easeInOutCubic,
+    );
+  }
+
+  // ✅ المفتاح: عندما يتغير initialValue من الخارج (مثلاً فشل المصادقة)
+  //    نُزامن حالة الزر الداخلية معه
   @override
-  void dispose() { _thumbAc.dispose(); super.dispose(); }
-  void _toggle() { setState(() => _isOn = !_isOn); _isOn ? _thumbAc.forward() : _thumbAc.reverse(); widget.onChanged?.call(_isOn); }
+  void didUpdateWidget(AnimatedToggleTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialValue != widget.initialValue) {
+      _isOn = widget.initialValue;
+      if (_isOn) {
+        _thumbAc.forward();
+      } else {
+        _thumbAc.reverse();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _thumbAc.dispose();
+    super.dispose();
+  }
+
+  void _toggle() {
+    setState(() => _isOn = !_isOn);
+    _isOn ? _thumbAc.forward() : _thumbAc.reverse();
+    widget.onChanged?.call(_isOn);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final bool isDark = context.theme.brightness == Brightness.dark; // 👈
+    final bool isDark = context.theme.brightness == Brightness.dark;
 
     return Column(
       children: [
@@ -31,8 +85,12 @@ class _AnimatedToggleTileState extends State<AnimatedToggleTile> with SingleTick
           child: Row(
             children: [
               Container(
-                width: 44, height: 44,
-                decoration: BoxDecoration(color: widget.iconColor.withOpacity(0.11), borderRadius: BorderRadius.circular(13)),
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: widget.iconColor.withOpacity(0.11),
+                  borderRadius: BorderRadius.circular(13),
+                ),
                 child: Icon(widget.icon, color: widget.iconColor, size: 21),
               ),
               const SizedBox(width: 14),
@@ -40,10 +98,24 @@ class _AnimatedToggleTileState extends State<AnimatedToggleTile> with SingleTick
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(widget.title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: isDark ? Colors.white : FPColors.textDark)), // 👈
+                    Text(
+                      widget.title,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white : FPColors.textDark,
+                      ),
+                    ),
                     if (widget.subtitle != null) ...[
                       const SizedBox(height: 3),
-                      Text(widget.subtitle!, style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : FPColors.textMid, fontWeight: FontWeight.w500)), // 👈
+                      Text(
+                        widget.subtitle!,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark ? Colors.white70 : FPColors.textMid,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                     ],
                   ],
                 ),
@@ -55,19 +127,45 @@ class _AnimatedToggleTileState extends State<AnimatedToggleTile> with SingleTick
                   animation: _thumbSlide,
                   builder: (_, __) {
                     final double t = _thumbSlide.value;
-                    // 👈 خلفية الزر تتجاوب مع الدارك مود
-                    final Color trackColor = Color.lerp(isDark ? Colors.grey.shade700 : Colors.grey.shade300, FPColors.primary, t)!;
+                    final Color trackColor = Color.lerp(
+                      isDark ? Colors.grey.shade700 : Colors.grey.shade300,
+                      FPColors.primary,
+                      t,
+                    )!;
                     return Container(
-                      width: 50, height: 28, padding: const EdgeInsets.all(3),
+                      width: 50,
+                      height: 28,
+                      padding: const EdgeInsets.all(3),
                       decoration: BoxDecoration(
-                        color: trackColor, borderRadius: BorderRadius.circular(14),
-                        boxShadow: [BoxShadow(color: _isOn ? FPColors.primary.withOpacity(0.28) : Colors.transparent, blurRadius: 8, offset: const Offset(0, 3))],
+                        color: trackColor,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: _isOn
+                                ? FPColors.primary.withOpacity(0.28)
+                                : Colors.transparent,
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
                       ),
                       child: Align(
-                        alignment: Alignment.lerp(Alignment.centerLeft, Alignment.centerRight, t)!,
+                        alignment:
+                        Alignment.lerp(Alignment.centerLeft, Alignment.centerRight, t)!,
                         child: Container(
-                          width: 22, height: 22,
-                          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))]),
+                          width: 22,
+                          height: 22,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black12,
+                                blurRadius: 4,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     );
@@ -77,7 +175,13 @@ class _AnimatedToggleTileState extends State<AnimatedToggleTile> with SingleTick
             ],
           ),
         ),
-        if (widget.showDivider) Divider(height: 1, indent: 76, endIndent: 18, color: context.theme.dividerColor), // 👈
+        if (widget.showDivider)
+          Divider(
+            height: 1,
+            indent: 76,
+            endIndent: 18,
+            color: context.theme.dividerColor,
+          ),
       ],
     );
   }
