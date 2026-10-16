@@ -1,347 +1,247 @@
+// =============================================================================
+//  lib/views/auth/login_screen.dart
+//  🎨 هوية الـ Splash: خلفية سوداء + شبكة + توهج ذهبي + شعار وعنوان ذهبيان
+//  ✅ منطق AuthController كما هو (login / toggleLoginPassword / المتحكمات)
+//  ✅ تحقق inline عند مغادرة الحقل + رسائل عربية واضحة تحت كل حقل
+//  ✅ منع الضغط المزدوج أثناء التحميل + اهتزاز وتركيز على أول حقل خاطئ
+//  ✅ دخول متدرّج للعناصر (يحترم "تقليل الحركة")
+// =============================================================================
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+
+import 'package:flashpay/core/app_transitions.dart';
+import 'package:flashpay/core/validators.dart';
+import 'package:flashpay/views/auth/widgets/fp_auth_field.dart';
+import 'package:flashpay/views/auth/widgets/fp_auth_style.dart';
+
 import '../../controllers/auth_controller.dart';
-import '../../core/constants.dart';
 
-class LoginScreen extends StatelessWidget {
-  final AuthController authController = Get.put(AuthController(), permanent: true);
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({Key? key}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        backgroundColor: context.theme.scaffoldBackgroundColor,
-        body: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: Container(
-              padding: const EdgeInsets.all(32.0),
-              decoration: BoxDecoration(
-                color: context.theme.cardColor,
-                borderRadius: BorderRadius.circular(24.0),
-                boxShadow: isDark
-                    ? []
-                    : [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
-                  )
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-
-                  // ── لوغو التطبيق المخصص ──────────────────────────────
-                  const _FlashPayLogo(),
-
-                  const SizedBox(height: 24),
-
-                  // ── اسم التطبيق ───────────────────────────────────────
-                  const _FlashPayBrand(),
-
-                  const SizedBox(height: 8),
-
-                  Text(
-                    'نظام إدارة الحوالات المالية',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: isDark ? Colors.white54 : Colors.grey.shade500,
-                      fontFamily: 'Cairo',
-                    ),
-                  ),
-
-                  const SizedBox(height: 36),
-
-                  _buildTextField(
-                    context: context,
-                    label: 'البريد الإلكتروني',
-                    hint: 'example@flashpay.com',
-                    icon: Icons.email_outlined,
-                    controller: authController.loginEmailController,
-                  ),
-                  const SizedBox(height: 16),
-
-                  Obx(() => _buildTextField(
-                    context: context,
-                    label: 'كلمة المرور',
-                    hint: 'أدخل كلمة المرور',
-                    icon: Icons.lock_outline,
-                    controller: authController.loginPasswordController,
-                    isPassword: true,
-                    isObscured: authController.isLoginPasswordHidden.value,
-                    onTogglePassword: authController.toggleLoginPassword,
-                  )),
-
-                  const SizedBox(height: 32),
-
-                  // ── زر تسجيل الدخول ──────────────────────────────────
-                  Container(
-                    width: double.infinity,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      gradient: AppColors.primaryGradient,
-                      borderRadius: BorderRadius.circular(14.0),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFA64D04).withOpacity(0.35),
-                          blurRadius: 16,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: ElevatedButton(
-                      onPressed: () => authController.login(),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.transparent,
-                        shadowColor: Colors.transparent,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14.0)),
-                      ),
-                      child: Obx(() => authController.isLoading.value
-                          ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2.5,
-                        ),
-                      )
-                          : const Text(
-                        'تسجيل الدخول',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          letterSpacing: 0.5,
-                        ),
-                      )),
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  TextButton(
-                    onPressed: () {},
-                    child: Text(
-                      'نسيت كلمة المرور؟',
-                      style: TextStyle(
-                          color: AppColors.primaryGradient.colors.first),
-                    ),
-                  ),
-
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'ليس لديك حساب؟',
-                        style: TextStyle(
-                            color: isDark ? Colors.white70 : Colors.black87),
-                      ),
-                      TextButton(
-                        onPressed: () => Get.toNamed('/register'),
-                        child: Text(
-                          'إنشاء حساب',
-                          style: TextStyle(
-                            color: AppColors.primaryGradient.colors.first,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTextField({
-    required BuildContext context,
-    required String label,
-    required String hint,
-    required IconData icon,
-    required TextEditingController controller,
-    bool isPassword = false,
-    bool isObscured = false,
-    VoidCallback? onTogglePassword,
-  }) {
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white : Colors.black87,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          obscureText: isObscured,
-          style:
-          TextStyle(color: isDark ? Colors.white : Colors.black87),
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: isDark
-                ? context.theme.scaffoldBackgroundColor
-                : Colors.white,
-            hintText: hint,
-            hintStyle: TextStyle(
-              color: isDark ? Colors.white38 : Colors.grey.shade400,
-              fontSize: 13,
-            ),
-            suffixIcon: Icon(icon,
-                color: AppColors.primaryGradient.colors.first),
-            prefixIcon: isPassword
-                ? IconButton(
-              icon: Icon(
-                isObscured ? Icons.visibility_off : Icons.visibility,
-                color: isDark ? Colors.white54 : Colors.grey,
-              ),
-              onPressed: onTogglePassword,
-            )
-                : null,
-            contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12.0),
-              borderSide:
-              BorderSide(color: context.theme.dividerColor),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12.0),
-              borderSide:
-              BorderSide(color: context.theme.dividerColor),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12.0),
-              borderSide: BorderSide(
-                color: AppColors.primaryGradient.colors.first,
-                width: 1.5,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
-// =============================================================================
-//  لوغو FlashPay المرسوم بـ Flutter (بدون assets)
-// =============================================================================
-class _FlashPayLogo extends StatelessWidget {
-  const _FlashPayLogo();
+class _LoginScreenState extends State<LoginScreen> {
+  final AuthController authController =
+  Get.put(AuthController(), permanent: true);
+
+  final _formKey = GlobalKey<FormState>();
+  final _emailKey = GlobalKey<FormFieldState<String>>();
+  final _passKey = GlobalKey<FormFieldState<String>>();
+  final _emailFocus = FocusNode();
+  final _passFocus = FocusNode();
+  final _shakeKey = GlobalKey<FPShakeState>();
 
   @override
-  Widget build(BuildContext context) {
-    final bool isDark = context.theme.brightness == Brightness.dark;
-
-    return Container(
-      width: 110,
-      height: 110,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: const LinearGradient(
-          colors: [Color(0xFFCC6010), Color(0xFFA64D04)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFA64D04).withOpacity(0.40),
-            blurRadius: 28,
-            offset: const Offset(0, 10),
-          ),
-          BoxShadow(
-            color: const Color(0xFFECB651).withOpacity(0.20),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // دائرة داخلية شفافة للعمق
-          Container(
-            width: 84,
-            height: 84,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white.withOpacity(0.10),
-            ),
-          ),
-          // أيقونة البرق ⚡
-          const Icon(
-            Icons.bolt_rounded,
-            size: 58,
-            color: Color(0xFFFFF0CC),
-          ),
-        ],
-      ),
-    );
+  void dispose() {
+    _emailFocus.dispose();
+    _passFocus.dispose();
+    super.dispose();
   }
-}
 
-// =============================================================================
-//  اسم FlashPay بخط ذهبي متدرج أنيق
-// =============================================================================
-class _FlashPayBrand extends StatelessWidget {
-  const _FlashPayBrand();
+  void _submit() {
+    FocusScope.of(context).unfocus();
+    if (authController.isLoading.value) return;
+
+    if (_formKey.currentState?.validate() ?? false) {
+      authController.login();
+      return;
+    }
+
+    HapticFeedback.lightImpact();
+    _shakeKey.currentState?.shake();
+    if (_emailKey.currentState?.hasError ?? false) {
+      _emailFocus.requestFocus();
+    } else if (_passKey.currentState?.hasError ?? false) {
+      _passFocus.requestFocus();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final bool isDark = context.theme.brightness == Brightness.dark;
+    return FPAuthTheme(
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: AnnotatedRegion<SystemUiOverlayStyle>(
+          value: const SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.light,
+            statusBarBrightness: Brightness.dark,
+            systemNavigationBarColor: FPAuth.bg,
+            systemNavigationBarIconBrightness: Brightness.light,
+          ),
+          child: Scaffold(
+            backgroundColor: FPAuth.bg,
+            body: FPAuthBackground(
+              child: SafeArea(
+                child: Center(
+                  child: SingleChildScrollView(
+                    keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 440),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // ── الهوية (مطابقة للـ Splash) ──
+                          const FPAuthLogo(size: 88).fpEntrance(context, 0),
+                          const SizedBox(height: 4),
+                          const FPAuthBrand(fontSize: 36)
+                              .fpEntrance(context, 1),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'تحويل فوري  ·  آمن  ·  موثوق',
+                            style: TextStyle(
+                              fontFamily: 'Cairo',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: FPAuth.textSub,
+                              letterSpacing: 1.0,
+                            ),
+                          ).fpEntrance(context, 2),
+                          const SizedBox(height: 28),
 
-    return Column(
-      children: [
-        // الاسم بتدرج ذهبي في الدارك، وبرتقالي في الفاتح
-        ShaderMask(
-          shaderCallback: (bounds) => LinearGradient(
-            colors: isDark
-                ? const [Color(0xFFECB651), Color(0xFFF5D27A), Color(0xFFECB651)]
-                : const [Color(0xFFCC6010), Color(0xFFA64D04)],
-            stops: isDark ? const [0.0, 0.5, 1.0] : null,
-          ).createShader(bounds),
-          child: const Text(
-            'FlashPay',
-            style: TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.w900,
-              color: Colors.white, // يُستبدل بالـ shader
-              letterSpacing: 1.2,
-              height: 1.0,
+                          // ── النموذج ──
+                          FPShake(
+                            key: _shakeKey,
+                            child: FPAuthCard(
+                              child: AutofillGroup(
+                                child: Form(
+                                  key: _formKey,
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment:
+                                    CrossAxisAlignment.stretch,
+                                    children: [
+                                      const Text(
+                                        'تسجيل الدخول',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontFamily: 'Cairo',
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w800,
+                                          color: FPAuth.text,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      const Text(
+                                        'نظام إدارة الحوالات المالية',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontFamily: 'Cairo',
+                                          fontSize: 13,
+                                          color: FPAuth.textSub,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 24),
+
+                                      FPAuthField(
+                                        label: 'البريد الإلكتروني',
+                                        hint: 'example@flashpay.com',
+                                        icon: Icons.email_outlined,
+                                        controller:
+                                        authController.loginEmailController,
+                                        fieldKey: _emailKey,
+                                        focusNode: _emailFocus,
+                                        keyboardType:
+                                        TextInputType.emailAddress,
+                                        textInputAction: TextInputAction.next,
+                                        autofillHints: const [
+                                          AutofillHints.email
+                                        ],
+                                        inputFormatters: [
+                                          FilteringTextInputFormatter.deny(
+                                              RegExp(r'\s')),
+                                        ],
+                                        validator: FPValidators.email,
+                                        onSubmitted: (_) =>
+                                            _passFocus.requestFocus(),
+                                      ),
+                                      const SizedBox(height: 16),
+
+                                      Obx(() => FPAuthField(
+                                        label: 'كلمة المرور',
+                                        hint: 'أدخل كلمة المرور',
+                                        icon: Icons.lock_outline,
+                                        controller: authController
+                                            .loginPasswordController,
+                                        fieldKey: _passKey,
+                                        focusNode: _passFocus,
+                                        isPassword: true,
+                                        isObscured: authController
+                                            .isLoginPasswordHidden.value,
+                                        onTogglePassword: authController
+                                            .toggleLoginPassword,
+                                        textInputAction:
+                                        TextInputAction.done,
+                                        autofillHints: const [
+                                          AutofillHints.password
+                                        ],
+                                        validator:
+                                        FPValidators.loginPassword,
+                                        onSubmitted: (_) => _submit(),
+                                      )),
+
+                                      Align(
+                                        alignment:
+                                        AlignmentDirectional.centerStart,
+                                        child: FPGoldLink(
+                                          label: 'نسيت كلمة المرور؟',
+                                          onPressed: () =>
+                                              Get.toNamed('/forgot_password'),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+
+                                      // ── زر تسجيل الدخول ──
+                                      Obx(() => FPGoldButton(
+                                        label: 'تسجيل الدخول',
+                                        loading:
+                                        authController.isLoading.value,
+                                        onPressed: _submit,
+                                      )),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ).fpEntrance(context, 3),
+
+                          const SizedBox(height: 20),
+
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Text(
+                                'ليس لديك حساب؟',
+                                style: TextStyle(
+                                  fontFamily: 'Cairo',
+                                  fontSize: 14,
+                                  color: FPAuth.textSub,
+                                ),
+                              ),
+                              FPGoldLink(
+                                label: 'إنشاء حساب',
+                                bold: true,
+                                onPressed: () => Get.toNamed('/register'),
+                              ),
+                            ],
+                          ).fpEntrance(context, 4),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         ),
-
-        const SizedBox(height: 6),
-
-        // خط تحت الاسم
-        Container(
-          width: 50,
-          height: 2.5,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Colors.transparent, Color(0xFFA64D04), Colors.transparent],
-            ),
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

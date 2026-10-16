@@ -62,4 +62,39 @@ class AuthRepository {
       rethrow;
     }
   }
+
+  // ===========================================================================
+  //  ✅ استعادة كلمة المرور
+  // ===========================================================================
+
+  Future<Response> forgotPassword(String email) async {
+    try {
+      return await _apiClient.dio.post(
+        ApiConstants.forgotPasswordEndpoint,
+        data: {'email': email},
+      );
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<Response> resetPassword({
+    required String email,
+    required String code,
+    required String password,
+  }) async {
+    try {
+      return await _apiClient.dio.post(
+        ApiConstants.resetPasswordEndpoint,
+        data: {
+          'email': email,
+          'code': code,
+          'password': password,
+          'password_confirmation': password,
+        },
+      );
+    } catch (e) {
+      rethrow;
+    }
+  }
 }

@@ -35,6 +35,7 @@ class StorageService extends GetxService {
     await _box.remove('user_role');
     await _box.remove('user_name');
     await _box.remove('is_blocked'); // \u2705 مسح حالة الحظر عند تسجيل الخروج
+    await _box.remove('user_id'); // لم يكن يُمسح عند الخروج
   }
 
   Future<void> saveUserName(String name) async {
@@ -45,12 +46,12 @@ class StorageService extends GetxService {
     return _box.read('user_name');
   }
   Future<void> saveUserId(int id) async {
-  await _box.write('user_id', id); // حفظ الـ ID
-}
+    await _box.write('user_id', id); // حفظ الـ ID
+  }
 
-int? getUserId() {
-  return _box.read('user_id'); // استرجاع الـ ID
-}
+  int? getUserId() {
+    return _box.read('user_id'); // استرجاع الـ ID
+  }
 
   // حفظ حالة الحظر
   Future<void> saveIsBlocked(bool isBlocked) async {
@@ -63,13 +64,13 @@ int? getUserId() {
   }
 
   void saveThemeMode(bool isDarkMode) {
-    
-     _box.write('isDarkMode', isDarkMode);
+
+    _box.write('isDarkMode', isDarkMode);
   }
 
+  // ✅ الافتراضي: داكن (يُطبَّق عند أول تشغيل، أو إذا لم يختر المستخدم ثيماً بنفسه)
   bool isDarkMode() {
-     return _box.read('isDarkMode') ?? false;
-  
+    return _box.read('isDarkMode') ?? true;
   }
 
 

@@ -1,5 +1,5 @@
 // ✅ بعد
-package com.example.flashpay;
+package com.flashpay.sy;
 
 import io.flutter.embedding.android.FlutterFragmentActivity;
 

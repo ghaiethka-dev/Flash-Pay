@@ -63,6 +63,6 @@ class DefaultFirebaseOptions {
     messagingSenderId: '499242475191',
     projectId: 'flash-pay-8174c',
     storageBucket: 'flash-pay-8174c.firebasestorage.app',
-    iosBundleId: 'com.example.flashpay',
+    iosBundleId: 'com.flashpay.sy',
   );
 }

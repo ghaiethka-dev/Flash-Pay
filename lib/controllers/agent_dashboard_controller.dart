@@ -3,6 +3,9 @@ import 'package:get/get.dart' hide FormData;
 import 'package:dio/dio.dart';
 import '../data/local/storage_service.dart';
 import '../data/network/api_client.dart';
+import 'package:flashpay/core/api_error.dart';
+import 'package:flashpay/core/fp_feedback.dart';
+import 'package:flashpay/core/validators.dart';
 import 'profile_controller.dart';
 
 class AgentDashboardController extends GetxController {
@@ -115,22 +118,27 @@ class AgentDashboardController extends GetxController {
           message = 'تم إرسال الحوالة إلى المكتب بنجاح';
         }
 
-        Get.snackbar(
-          'نجاح',
-          message,
-          backgroundColor:
-          newStatus == 'rejected' ? Colors.red : Colors.green,
-          colorText: Colors.white,
-        );
+        if (newStatus == 'rejected') {
+          FPFeedback.info(message, title: 'تم الرفض');
+        } else {
+          FPFeedback.success(message);
+        }
 
         fetchAgentTransfers();
         fetchAgentSafe(); // تحديث صندوق بعد أي تغيير
       }
     } on DioException catch (e) {
-      Get.back();
-      Get.snackbar('خطأ', 'فشل تحديث حالة الحوالة',
-          backgroundColor: Colors.red, colorText: Colors.white);
+      if (Get.isDialogOpen ?? false) Get.back();
+      FPFeedback.error(
+        ApiError.message(e, fallback: 'فشل تحديث حالة الحوالة'),
+        title: 'تعذّر تحديث الحوالة',
+      );
       print(e.response?.data);
+    } catch (e) {
+      // بدون هذا يبقى مؤشر التحميل معلّقًا على الشاشة عند أي خطأ غير متوقع
+      if (Get.isDialogOpen ?? false) Get.back();
+      print('updateTransferStatus unexpected error: $e');
+      FPFeedback.error('حدث خطأ غير متوقع، حاول مرة أخرى');
     }
   }
 }

@@ -1,8 +1,18 @@
+// =============================================================================
+//  chat_controller.dart — FlashPay
+//  ✅ تحديث تلقائي: polling صامت كل 4 ثوانٍ (مع تباطؤ عند فشل الشبكة)
+//  ✅ يتوقف في الخلفية ويُستأنف فوراً عند العودة للتطبيق
+//  ✅ Pusher يبقى كمسار لحظي إضافي (والتكرار مُمنوع بالـ id)
+//  ✅ لا قفز في التمرير: ينزل تلقائياً فقط إن كان المستخدم أسفل المحادثة،
+//     وإلا تظهر شارة "رسائل جديدة"
+// =============================================================================
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flashpay/data/network/api_client.dart';
 import 'package:flashpay/data/network/api_constants.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:dio/dio.dart' as dio;
 import 'package:image_picker/image_picker.dart';
@@ -10,36 +20,62 @@ import 'package:pusher_client_fixed/pusher_client_fixed.dart';
 import '../models/message_model.dart';
 import '../data/local/storage_service.dart';
 
-class ChatController extends GetxController {
+class ChatController extends GetxController with WidgetsBindingObserver {
   final int transferId;
   final int currentUserId;
 
   ChatController({required this.transferId, required this.currentUserId});
 
-  var isLoading = true.obs;
+  // ── الحالة المرصودة ─────────────────────────────────────────────────────
+  var isLoading = true.obs;          // تحميل أولي فقط (يُظهر هيكل التحميل)
   var isSending = false.obs;
   var messages = <MessageModel>[].obs;
   var selectedImageFile = Rx<File?>(null);
+
+  final isSyncing = false.obs;       // تحديث صامت جارٍ
+  final isOnline = true.obs;         // آخر محاولة تحديث نجحت؟
+  final unreadNew = 0.obs;           // رسائل جديدة وصلت والمستخدم بعيد عن الأسفل
+  final showJumpToBottom = false.obs;
 
   final TextEditingController messageController = TextEditingController();
   final ScrollController scrollController = ScrollController();
   late final dio.Dio _dio;
 
+  // ── التحديث التلقائي ────────────────────────────────────────────────────
+  static const int _pollSeconds = 4;
+  Timer? _pollTimer;
+  bool _fetching = false;
+  bool _inForeground = true;
+  bool _closed = false;
+  bool _nearBottom = true;
+  int _failures = 0;
+  // رسائل أُرسلت للتو محلياً وقد لا تكون ظهرت بعد في رد تحديث بدأ قبل الإرسال
+  final Set<int> _pendingLocalIds = {};
+
+  // ── Pusher ──────────────────────────────────────────────────────────────
   late PusherClient pusher;
   late Channel channel;
   bool _pusherInitialized = false;
-  bool _channelSubscribed = false; // ✅ منع الاشتراك المزدوج
+  bool _channelSubscribed = false;
 
   @override
   void onInit() {
     super.onInit();
     _dio = ApiClient().dio;
+    WidgetsBinding.instance.addObserver(this);
+    scrollController.addListener(_onScroll);
     fetchMessages();
     initPusher();
+    _scheduleNextPoll();
   }
 
   @override
   void onClose() {
+    _closed = true;
+    _pollTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    scrollController.removeListener(_onScroll);
+
     if (_pusherInitialized && _channelSubscribed) {
       try {
         channel.unbind('App\\Events\\MessageSent');
@@ -60,27 +96,93 @@ class ChatController extends GetxController {
     super.onClose();
   }
 
+  // ===========================================================================
+  //  دورة حياة التطبيق: أوقف التحديث في الخلفية، واستأنفه فوراً عند العودة
+  // ===========================================================================
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      _inForeground = false;
+      _pollTimer?.cancel();
+    } else if (state == AppLifecycleState.resumed) {
+      _inForeground = true;
+      _failures = 0;
+      fetchMessages(silent: true).then((_) => _scheduleNextPoll());
+    }
+  }
+
+  // ===========================================================================
+  //  Polling ذاتي الجدولة (لا تتراكم الطلبات): 4ث، ثم يتباطأ حتى 32ث عند الفشل
+  // ===========================================================================
+  void _scheduleNextPoll() {
+    _pollTimer?.cancel();
+    if (_closed || !_inForeground) return;
+    final secs = _failures == 0 ? _pollSeconds : _pollSeconds * (1 << _failures.clamp(0, 3).toInt());
+    _pollTimer = Timer(Duration(seconds: secs), () async {
+      await fetchMessages(silent: true);
+      _scheduleNextPoll();
+    });
+  }
+
+  // ===========================================================================
+  //  التمرير
+  // ===========================================================================
+  void _onScroll() {
+    if (!scrollController.hasClients) return;
+    final p = scrollController.position;
+    final near = (p.maxScrollExtent - p.pixels) < 140;
+    _nearBottom = near;
+    if (showJumpToBottom.value == near) showJumpToBottom.value = !near;
+    if (near && unreadNew.value > 0) unreadNew.value = 0;
+  }
+
+  /// ينزل لآخر رسالة. initial=true يعيد المحاولة بعد تحميل الصور لتصحيح الارتفاع
+  void scrollToBottom({bool initial = false}) {
+    void go(bool animate) {
+      if (!scrollController.hasClients) return;
+      final max = scrollController.position.maxScrollExtent;
+      if (animate) {
+        scrollController.animateTo(
+          max,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      } else {
+        scrollController.jumpTo(max);
+      }
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => go(!initial));
+    if (initial) {
+      Future.delayed(const Duration(milliseconds: 450), () => go(false));
+    }
+    unreadNew.value = 0;
+  }
+
+  // ===========================================================================
+  //  الصور
+  // ===========================================================================
   Future<void> pickImage(ImageSource source) async {
-    final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: source);
-    if (image != null) {
-      selectedImageFile.value = File(image.path);
+    try {
+      final XFile? image = await ImagePicker().pickImage(
+        source: source,
+        imageQuality: 82,  // ضغط خفيف: الحد الأقصى في السيرفر 5MB
+        maxWidth: 1800,
+      );
+      if (image != null) selectedImageFile.value = File(image.path);
+    } catch (e) {
+      debugPrint("pickImage error: $e");
+      Get.snackbar('تعذّر فتح الصور', 'تحقق من صلاحيات الكاميرا والمعرض');
     }
   }
 
-  void removeImage() {
-    selectedImageFile.value = null;
-  }
+  void removeImage() => selectedImageFile.value = null;
 
-  // =====================================================
-  // ✅ إعداد Pusher مع إصلاح استقبال الرسائل اللحظي
-  // =====================================================
+  // ===========================================================================
+  //  Pusher (مسار لحظي إضافي — التطبيق يعمل بدونه بفضل الـ polling)
+  // ===========================================================================
   Future<void> initPusher() async {
-    // ✅ إذا كان Pusher شغالاً والقناة مشتركة → لا تعيد التهيئة
-    if (_pusherInitialized && _channelSubscribed) {
-      debugPrint("Pusher: already initialized and subscribed, skipping.");
-      return;
-    }
+    if (_pusherInitialized && _channelSubscribed) return;
 
     try {
       String? token = Get.find<StorageService>().getToken();
@@ -100,7 +202,6 @@ class ChatController extends GetxController {
         ),
       );
 
-      // ✅ إذا كان Pusher موجوداً بالفعل لا تُنشئ نسخة جديدة
       if (!_pusherInitialized) {
         pusher = PusherClient(
           "u2hdemwhetdsiavg3a9d",
@@ -112,41 +213,28 @@ class ChatController extends GetxController {
         pusher.onConnectionStateChange((state) {
           debugPrint("Pusher State: ${state?.currentState}");
         });
-
         pusher.onConnectionError((error) {
           debugPrint("Pusher Connection Error: ${error?.message}");
         });
       }
 
-      // ✅ لا تشترك إذا كانت القناة مشتركة مسبقاً
       if (!_channelSubscribed) {
         channel = pusher.subscribe('private-transfer.$transferId');
         _channelSubscribed = true;
 
         channel.bind('App\\Events\\MessageSent', (event) {
           if (event?.data == null) return;
-
           try {
             final dynamic raw = event!.data is String
                 ? json.decode(event.data!)
                 : event.data;
-
             final dynamic msgData = raw['message'] ?? raw;
-
             final newMsg = MessageModel.fromJson(
               msgData is String ? json.decode(msgData) : msgData,
             );
-
-            final bool alreadyExists = messages.any((m) => m.id == newMsg.id);
-            if (alreadyExists) return;
-
-            if (newMsg.senderId != currentUserId) {
-              messages.add(newMsg);
-              _scrollToBottom();
-            }
+            _ingestIncoming(newMsg);
           } catch (e) {
             debugPrint("Pusher Event Parse Error: $e");
-            debugPrint("Raw event data: ${event?.data}");
           }
         });
       }
@@ -155,44 +243,128 @@ class ChatController extends GetxController {
     }
   }
 
-  // ✅ جلب الرسائل السابقة
-  Future<void> fetchMessages() async {
-    try {
+  /// رسالة واحدة وصلت لحظياً من Pusher
+  void _ingestIncoming(MessageModel newMsg) {
+    if (messages.any((m) => m.id == newMsg.id)) return;
+    if (newMsg.senderId == currentUserId) return;
+    messages.add(newMsg);
+    HapticFeedback.selectionClick();
+    if (_nearBottom) {
+      scrollToBottom();
+    } else {
+      unreadNew.value += 1;
+    }
+  }
+
+  // ===========================================================================
+  //  جلب الرسائل
+  //  silent=false → تحميل أولي بهيكل تحميل | silent=true → تحديث خلفي بلا وميض
+  // ===========================================================================
+  Future<void> fetchMessages({bool silent = false}) async {
+    if (_fetching) return;
+    _fetching = true;
+    if (silent) {
+      isSyncing(true);
+    } else {
       isLoading(true);
+    }
+
+    try {
       final response = await _dio.get('/transfers/$transferId/messages');
 
       if (response.statusCode == 200) {
         final data = response.data['data'] as List;
-        messages.value = data.map((m) => MessageModel.fromJson(m)).toList();
-        _scrollToBottom();
+        final fresh = data
+            .map((m) => MessageModel.fromJson(m as Map<String, dynamic>))
+            .toList();
+        _failures = 0;
+        isOnline(true);
+        _applyFresh(fresh, firstLoad: !silent);
       }
     } on dio.DioException catch (e) {
-      Get.snackbar('خطأ', 'فشل تحميل المحادثة');
+      _failures++;
+      isOnline(false);
+      if (!silent) Get.snackbar('تعذّر التحميل', 'تحقق من اتصالك بالإنترنت');
       debugPrint("fetchMessages error: ${e.response?.data}");
+    } catch (e) {
+      _failures++;
+      debugPrint("fetchMessages parse error: $e");
     } finally {
+      _fetching = false;
       isLoading(false);
+      isSyncing(false);
     }
   }
 
-  // ✅ إرسال رسالة (نص + صورة اختياري)
+  bool _sameList(List<MessageModel> a, List<MessageModel> b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i].id != b[i].id ||
+          a[i].isRead != b[i].isRead ||
+          a[i].imageUrl != b[i].imageUrl) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  void _applyFresh(List<MessageModel> fresh, {required bool firstLoad}) {
+    final freshIds = fresh.map((m) => m.id).toSet();
+
+    // لا تُسقط رسالة أُرسلت للتو ولم تظهر بعد في هذا الرد
+    final merged = [...fresh];
+    for (final m in messages) {
+      if (_pendingLocalIds.contains(m.id) && !freshIds.contains(m.id)) {
+        merged.add(m);
+      }
+    }
+    _pendingLocalIds.removeWhere(freshIds.contains);
+
+    final oldIds = messages.map((m) => m.id).toSet();
+    final changed = !_sameList(messages, merged);
+
+    if (firstLoad) {
+      if (changed) messages.assignAll(merged);
+      scrollToBottom(initial: true);
+      return;
+    }
+    if (!changed) return;
+
+    final added = merged.where((m) => !oldIds.contains(m.id)).toList();
+    messages.assignAll(merged);
+    if (added.isEmpty) return; // تغيّرت علامات القراءة فقط
+
+    final fromOthers = added.where((m) => m.senderId != currentUserId).length;
+    final mine = added.any((m) => m.senderId == currentUserId);
+
+    if (_nearBottom || mine) {
+      scrollToBottom();
+    } else if (fromOthers > 0) {
+      unreadNew.value += fromOthers;
+    }
+    if (fromOthers > 0) HapticFeedback.selectionClick();
+  }
+
+  // ===========================================================================
+  //  إرسال رسالة (نص + صورة اختيارية)
+  // ===========================================================================
   Future<void> sendMessage() async {
+    if (isSending.value) return;
     final text = messageController.text.trim();
     if (text.isEmpty && selectedImageFile.value == null) return;
 
     isSending(true);
 
     try {
-      dio.FormData formData = dio.FormData.fromMap({
-        "message": text,
-      });
+      final formData = dio.FormData.fromMap({"message": text});
 
-      if (selectedImageFile.value != null) {
-        String fileName = selectedImageFile.value!.path.split('/').last;
+      final file = selectedImageFile.value;
+      if (file != null) {
         formData.files.add(MapEntry(
           "image",
           await dio.MultipartFile.fromFile(
-            selectedImageFile.value!.path,
-            filename: fileName,
+            file.path,
+            filename: file.path.split('/').last,
           ),
         ));
       }
@@ -204,35 +376,23 @@ class ChatController extends GetxController {
 
       if (response.statusCode == 201) {
         final data = response.data['data'] as List;
-        for (var m in data) {
-          final newMsg = MessageModel.fromJson(m);
-          // ✅ تجنب التكرار — Pusher قد يُعيد نفس الرسالة
-          final bool alreadyExists = messages.any((msg) => msg.id == newMsg.id);
-          if (!alreadyExists) {
+        for (final m in data) {
+          final newMsg = MessageModel.fromJson(m as Map<String, dynamic>);
+          if (!messages.any((x) => x.id == newMsg.id)) {
             messages.add(newMsg);
+            _pendingLocalIds.add(newMsg.id);
           }
         }
         messageController.clear();
         selectedImageFile.value = null;
-        _scrollToBottom();
+        isOnline(true);
+        scrollToBottom();
       }
     } on dio.DioException catch (e) {
-      Get.snackbar('خطأ', 'لم يتم إرسال الرسالة');
+      Get.snackbar('تعذّر الإرسال', 'لم تُرسل الرسالة، حاول مرة أخرى');
       debugPrint("sendMessage error: ${e.response?.data}");
     } finally {
       isSending(false);
     }
-  }
-
-  void _scrollToBottom() {
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (scrollController.hasClients) {
-        scrollController.animateTo(
-          scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
   }
 }

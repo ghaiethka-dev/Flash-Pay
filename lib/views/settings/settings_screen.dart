@@ -5,6 +5,8 @@
 // =============================================================================
 
 import 'package:flashpay/controllers/theme_controller.dart';
+import 'package:flashpay/views/settings/widgets/how_it_works_screen.dart';
+import 'package:flashpay/views/settings/widgets/team_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -20,6 +22,7 @@ import 'widgets/animated_toggle_tile.dart';
 import 'widgets/custom_settings_tile.dart';
 import 'widgets/logout_button.dart';
 import 'widgets/settings_section_card.dart';
+
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -235,6 +238,20 @@ class SettingsScreen extends StatelessWidget {
                       iconColor: FPColors.blue,
                       children: [
                         _TelegramSupportTile(onTap: _openTelegram),
+                        CustomSettingsTile(
+                          icon: Icons.menu_book_rounded,
+                          iconColor: FPColors.primary,
+                          title: 'كيف يعمل التطبيق',
+                          subtitle: 'شرح خطوات الإرسال والاستلام',
+                          onTap: () => Get.to(() => const HowItWorksScreen()),
+                        ),
+                        CustomSettingsTile(
+                          icon: Icons.groups_rounded,
+                          iconColor: FPColors.purple,
+                          title: 'فريق العمل',
+                          subtitle: 'تعرّف على مهندسي Flash Pay',
+                          onTap: () => Get.to(() => const TeamScreen()),
+                        ),
                         CustomSettingsTile(
                           icon: Icons.info_outline_rounded,
                           iconColor: FPColors.textMid,

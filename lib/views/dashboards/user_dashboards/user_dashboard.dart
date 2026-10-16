@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
+import 'package:flashpay/controllers/notification_controller.dart';
 import 'package:flashpay/controllers/user_dashboard_controller.dart';
 import 'package:flashpay/views/profile/account_screen.dart';
 import 'package:flashpay/views/settings/settings_screen.dart';
@@ -21,18 +22,38 @@ class UserDashboardView extends StatefulWidget {
 class _UserDashboardViewState extends State<UserDashboardView> {
   late final UserDashboardController controller;
   late final PageController _pageController;
+  late final Worker _indexWorker;
 
   @override
   void initState() {
     super.initState();
     controller = Get.put(UserDashboardController());
+
+    // ✅ يضمن وجود متحكم الإشعارات من أول لحظة (حتى لا يفوت أي إشعار)
+    if (!Get.isRegistered<NotificationController>()) {
+      Get.put(NotificationController(), permanent: true);
+    }
+
     _pageController = PageController(
       initialPage: controller.selectedIndex.value,
     );
+
+    // ✅ أي تغيير للتبويب (من الشريط أو من الجرس في الهيدر) ينقل الصفحة
+    _indexWorker = ever<int>(controller.selectedIndex, (i) {
+      if (!_pageController.hasClients) return;
+      if (_pageController.page?.round() != i) {
+        _pageController.animateToPage(
+          i,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
   }
 
   @override
   void dispose() {
+    _indexWorker.dispose();
     _pageController.dispose();
     super.dispose();
   }
@@ -45,7 +66,7 @@ class _UserDashboardViewState extends State<UserDashboardView> {
         // نبقي الأيقونات بيضاء دائماً لأن الهيدر العلوي ملون (Gradient)
         value: const SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.light, 
+          statusBarIconBrightness: Brightness.light,
           statusBarBrightness: Brightness.dark,
         ),
         child: Scaffold(
@@ -68,16 +89,9 @@ class _UserDashboardViewState extends State<UserDashboardView> {
           ),
 
           bottomNavigationBar: Obx(
-            () => FPBottomNavBar(
+                () => FPBottomNavBar(
               selectedIndex: controller.selectedIndex.value,
-              onTabChange: (index) {
-                controller.changeTabIndex(index);
-                _pageController.animateToPage(
-                  index,
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeInOut,
-                );
-              },
+              onTabChange: (index) => controller.changeTabIndex(index),
             ),
           ),
         ),

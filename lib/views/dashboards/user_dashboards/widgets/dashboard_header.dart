@@ -9,7 +9,10 @@
 // =============================================================================
 
 import 'package:flutter/material.dart';
+import 'package:flashpay/controllers/notification_controller.dart';
+import 'package:flashpay/controllers/user_dashboard_controller.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:get/get.dart';
 import 'fp_theme.dart';
 import 'glass_stats_strip.dart';
 
@@ -155,20 +158,96 @@ class _TopBar extends StatelessWidget {
         // ✅ FIX: spacer pushes notification button to the far end correctly
         const Spacer(),
 
-        // Notification button
-        Container(
-          width: 44, height: 44,
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.16),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-                color: Colors.white.withOpacity(0.22), width: 1),
-          ),
-          child: const Icon(Icons.notifications_none_rounded,
-              color: Colors.white, size: 22),
-        ),
+        // Notification button (تفاعلي + شارة غير المقروء)
+        const _BellButton(),
       ],
     );
+  }
+}
+
+// ─── Bell button ──────────────────────────────────────────────────────────────
+class _BellButton extends StatelessWidget {
+  const _BellButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final nc = Get.isRegistered<NotificationController>()
+        ? Get.find<NotificationController>()
+        : null;
+
+    // Obx يتطلب قراءة متغيّر تفاعلي، لذا لا نستخدمه إذا لم يُسجَّل المتحكم بعد
+    if (nc == null) return _build(0);
+    return Obx(() => _build(nc.unread.value));
+  }
+
+  Widget _build(int unread) {
+    {
+      return Semantics(
+        button: true,
+        label: unread > 0 ? 'الإشعارات، $unread غير مقروءة' : 'الإشعارات',
+        child: Tooltip(
+          message: 'الإشعارات',
+          child: Material(
+            color: Colors.white.withOpacity(0.16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: BorderSide(color: Colors.white.withOpacity(0.22)),
+            ),
+            child: InkWell(
+              customBorder: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
+              onTap: () {
+                if (Get.isRegistered<UserDashboardController>()) {
+                  Get.find<UserDashboardController>().changeTabIndex(1);
+                }
+              },
+              child: SizedBox(
+                width: 46,
+                height: 46,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  alignment: Alignment.center,
+                  children: [
+                    Icon(
+                      unread > 0
+                          ? Icons.notifications_active_rounded
+                          : Icons.notifications_none_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                    if (unread > 0)
+                      Positioned(
+                        top: 3,
+                        right: 3,
+                        child: Container(
+                          constraints: const BoxConstraints(
+                              minWidth: 18, minHeight: 18),
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFDC2626),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.white, width: 1.5),
+                          ),
+                          child: Text(
+                            unread > 9 ? '9+' : '$unread',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              height: 1.1,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
   }
 }
 
